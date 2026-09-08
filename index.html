@@ -16,10 +16,13 @@
             touch-action: none; /* Prevents pull-to-refresh on iOS */
             user-select: none;
             color: #fff;
+            /* Fix for iOS tap highlight */
+            -webkit-tap-highlight-color: transparent; 
         }
         
         #gameCanvas {
             display: block; width: 100%; height: 100%;
+            position: absolute; top: 0; left: 0; z-index: 1;
         }
 
         /* UI Overlays */
@@ -27,6 +30,7 @@
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             background: rgba(0, 0, 0, 0.85); z-index: 10; text-align: center;
+            pointer-events: auto; /* Ensure overlays can receive clicks */
         }
         
         h1 {
@@ -39,6 +43,9 @@
             padding: 15px 30px; font-size: 18px; font-family: inherit;
             cursor: pointer; text-transform: uppercase; margin-top: 20px;
             box-shadow: 4px 4px 0px #fff;
+            pointer-events: auto; /* CRITICAL: Ensure button gets clicks */
+            position: relative; /* CRITICAL for z-index context */
+            z-index: 20;
         }
         .btn:active { box-shadow: 0px 0px 0px #fff; transform: translate(4px, 4px); }
 
@@ -52,8 +59,8 @@
             pointer-events: none; z-index: 5; text-shadow: 2px 2px 0px #000;
         }
         
-        .hud-left { display: flex; flex-direction: column; gap: 8px; }
-        .hud-right { text-align: right; font-size: 12px; color: #f1c40f; }
+        .hud-left { display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .hud-right { text-align: right; font-size: 12px; color: #f1c40f; pointer-events: none; }
         #scoreDisplay { font-size: 20px; color: #2ecc71; }
         #distDisplay { font-size: 12px; color: #fff; }
         #stageDisplay { font-size: 12px; margin-top: 5px; color: #e74c3c; animation: blink 1s infinite; }
@@ -74,6 +81,9 @@
 </head>
 <body>
 
+    <!-- Canvas needs to be first in DOM for touch events to bubble correctly if overlays are hidden -->
+    <canvas id="gameCanvas"></canvas>
+
     <div id="hud" class="hidden">
         <div class="hud-left">
             <div id="scoreDisplay">000000</div>
@@ -89,7 +99,8 @@
     <div id="startScreen" class="overlay">
         <h1>AMBULANCE AURUM<br>& ABDUL ROOF</h1>
         <div class="stats">HIGH SCORE: <span id="hiScoreMenu">0</span></div>
-        <button class="btn" id="startBtn">START WEE WOO</button>
+        <!-- Changed IDs slightly and ensured they are buttons -->
+        <button class="btn" id="startBtnEl">START WEE WOO</button>
         <div class="controls-hint">
             TAP LEFT HALF: Jump / Double Jump<br>
             TAP BOTTOM RIGHT: Shoot Straight<br>
@@ -101,37 +112,51 @@
         <h1 style="color: #e74c3c; text-shadow: 4px 4px 0px #fff;">CRASHED!</h1>
         <div class="stats" style="color: #fff; font-size: 18px;">SCORE: <span id="finalScore">0</span></div>
         <div class="stats">HIGH SCORE: <span id="hiScoreEnd">0</span></div>
-        <button class="btn" id="restartBtn">TRY AGAIN</button>
+        <button class="btn" id="restartBtnEl">TRY AGAIN</button>
     </div>
 
     <div id="orientationWarning" class="overlay">
         <h2 style="color: yellow; text-align:center; padding: 20px;">PLEASE ROTATE<br>YOUR PHONE<br>TO LANDSCAPE</h2>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
-
 <script>
 /** * AUDIO SYNTH ENGINE 
  * Generates retro sound effects dynamically.
  */
-const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
 let sirenInterval = null;
 let sirenToggle = false;
 
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
 function playTone(freq, type, duration, vol=0.1) {
+    if(!audioCtx) return;
     if(audioCtx.state === 'suspended') audioCtx.resume();
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
     
-    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-    
-    osc.connect(gain);
-    gain.connect(audioCtx.destination);
-    osc.start();
-    osc.stop(audioCtx.currentTime + duration);
+    try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        
+        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    } catch(e) {
+        console.log("Audio play error avoided", e);
+    }
 }
 
 function sfxJump() { playTone(400, 'square', 0.2, 0.05); setTimeout(()=>playTone(600, 'square', 0.2, 0.05), 100); }
@@ -176,7 +201,9 @@ const ui = {
     bossHp: document.getElementById('bossHpDisplay'),
     power: document.getElementById('powerupDisplay'),
     hiMenu: document.getElementById('hiScoreMenu'),
-    hiEnd: document.getElementById('hiScoreEnd')
+    hiEnd: document.getElementById('hiScoreEnd'),
+    startBtn: document.getElementById('startBtnEl'),
+    restartBtn: document.getElementById('restartBtnEl')
 };
 
 // Storage
@@ -192,6 +219,7 @@ let currentStage = 0;
 let globalSpeed = 6;
 let screenShake = 0;
 let bossTargetPoints = 1000; 
+let renderLoopStarted = false;
 
 const stages = [
     { name: "STAGE 1: CITY", bg: "#1a1a2e", ground: "#16213e", obs: "#95a5a6", fire: "#e67e22", roof: "#3498db" },
@@ -753,8 +781,15 @@ function gameLoop() {
 }
 
 // Game Flow controls
-function startGame() {
-    if(audioCtx.state === 'suspended') audioCtx.resume();
+function startGame(e) {
+    // Prevent event from bubbling up and immediately triggering a jump on touch devices
+    if(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    initAudio(); // Initialize audio context on first user interaction
+    
     ui.start.classList.add('hidden');
     ui.over.classList.add('hidden');
     ui.hud.classList.remove('hidden');
@@ -777,6 +812,11 @@ function startGame() {
     ui.stage.style.color = stages[0].fire;
     
     startSiren();
+    
+    if(!renderLoopStarted) {
+        renderLoopStarted = true;
+        requestAnimationFrame(gameLoop);
+    }
 }
 
 function gameOver() {
@@ -805,8 +845,12 @@ function handleInput(e, isTouch = false) {
     if (isTouch) {
         // Prevent default zoom/scroll on canvas
         e.preventDefault(); 
-        x = e.changedTouches[0].clientX;
-        y = e.changedTouches[0].clientY;
+        if(e.changedTouches && e.changedTouches.length > 0) {
+            x = e.changedTouches[0].clientX;
+            y = e.changedTouches[0].clientY;
+        } else {
+            return;
+        }
     } else {
         // Keyboard mapping: Space = Jump, F = Shoot straight, G = Shoot Up
         if (e.code === 'Space') { player.jump(); return; }
@@ -823,11 +867,15 @@ function handleInput(e, isTouch = false) {
     }
 }
 
-window.addEventListener('touchstart', (e) => handleInput(e, true), {passive: false});
-window.addEventListener('keydown', (e) => handleInput(e, false));
+// Ensure buttons capture both click and touch events correctly
+['click', 'touchstart'].forEach(evt => {
+    ui.startBtn.addEventListener(evt, startGame, {passive: false});
+    ui.restartBtn.addEventListener(evt, startGame, {passive: false});
+});
 
-ui.startBtn.addEventListener('click', startGame);
-ui.restartBtn.addEventListener('click', startGame);
+// Canvas input listeners
+canvas.addEventListener('touchstart', (e) => handleInput(e, true), {passive: false});
+window.addEventListener('keydown', (e) => handleInput(e, false));
 
 // Prevent context menu on long press
 window.oncontextmenu = function(event) {
@@ -836,8 +884,12 @@ window.oncontextmenu = function(event) {
      return false;
 };
 
-// Start Render Loop (menu background)
-requestAnimationFrame(gameLoop);
+// Initial draw to populate background before game starts
+draw();
+if(!renderLoopStarted) {
+    renderLoopStarted = true;
+    requestAnimationFrame(gameLoop);
+}
 
 </script>
 </body>
