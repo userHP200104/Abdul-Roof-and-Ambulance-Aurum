@@ -13,24 +13,24 @@
             margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: #000; overflow: hidden;
             font-family: 'Press Start 2P', monospace;
-            touch-action: none; /* Prevents pull-to-refresh on iOS */
+            touch-action: none; 
             user-select: none;
             color: #fff;
-            /* Fix for iOS tap highlight */
             -webkit-tap-highlight-color: transparent; 
         }
         
         #gameCanvas {
             display: block; width: 100%; height: 100%;
             position: absolute; top: 0; left: 0; z-index: 1;
+            /* Ensures scaling doesn't blur the canvas artificially via CSS */
+            image-rendering: pixelated; 
         }
 
-        /* UI Overlays */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
             background: rgba(0, 0, 0, 0.85); z-index: 10; text-align: center;
-            pointer-events: auto; /* Ensure overlays can receive clicks */
+            pointer-events: auto;
         }
         
         h1 {
@@ -43,8 +43,8 @@
             padding: 15px 30px; font-size: 18px; font-family: inherit;
             cursor: pointer; text-transform: uppercase; margin-top: 20px;
             box-shadow: 4px 4px 0px #fff;
-            pointer-events: auto; /* CRITICAL: Ensure button gets clicks */
-            position: relative; /* CRITICAL for z-index context */
+            pointer-events: auto;
+            position: relative;
             z-index: 20;
         }
         .btn:active { box-shadow: 0px 0px 0px #fff; transform: translate(4px, 4px); }
@@ -52,7 +52,6 @@
         .stats { margin-top: 20px; font-size: 14px; color: #3498db; }
         .controls-hint { margin-top: 40px; font-size: 10px; color: #aaa; line-height: 1.8; max-width: 80%; }
 
-        /* HUD */
         #hud {
             position: absolute; top: 0; left: 0; width: 100%; padding: 15px;
             display: flex; justify-content: space-between; align-items: flex-start;
@@ -70,7 +69,6 @@
         
         .hidden { display: none !important; }
         
-        /* Mobile orientation warning */
         #orientationWarning {
             display: none; background: #000; z-index: 999;
         }
@@ -81,7 +79,6 @@
 </head>
 <body>
 
-    <!-- Canvas needs to be first in DOM for touch events to bubble correctly if overlays are hidden -->
     <canvas id="gameCanvas"></canvas>
 
     <div id="hud" class="hidden">
@@ -99,7 +96,6 @@
     <div id="startScreen" class="overlay">
         <h1>AMBULANCE AURUM<br>& ABDUL ROOF</h1>
         <div class="stats">HIGH SCORE: <span id="hiScoreMenu">0</span></div>
-        <!-- Changed IDs slightly and ensured they are buttons -->
         <button class="btn" id="startBtnEl">START WEE WOO</button>
         <div class="controls-hint">
             TAP LEFT HALF: Jump / Double Jump<br>
@@ -116,47 +112,35 @@
     </div>
 
     <div id="orientationWarning" class="overlay">
-        <h2 style="color: yellow; text-align:center; padding: 20px;">PLEASE ROTATE<br>YOUR PHONE<br>TO LANDSCAPE</h2>
+        <h2 style="color: yellow; text-align:center; padding: 20px; line-height: 1.5;">PLEASE ROTATE<br>YOUR PHONE<br>TO LANDSCAPE</h2>
     </div>
 
 <script>
-/** * AUDIO SYNTH ENGINE 
- * Generates retro sound effects dynamically.
- */
+/** * AUDIO SYNTH ENGINE */
 const AudioContext = window.AudioContext || window.webkitAudioContext;
 let audioCtx;
 let sirenInterval = null;
 let sirenToggle = false;
 
 function initAudio() {
-    if (!audioCtx) {
-        audioCtx = new AudioContext();
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-    }
+    if (!audioCtx) audioCtx = new AudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 }
 
 function playTone(freq, type, duration, vol=0.1) {
-    if(!audioCtx) return;
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-    
+    if(!audioCtx || audioCtx.state === 'suspended') return;
     try {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        
         gain.gain.setValueAtTime(vol, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-        
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.start();
         osc.stop(audioCtx.currentTime + duration);
-    } catch(e) {
-        console.log("Audio play error avoided", e);
-    }
+    } catch(e) {}
 }
 
 function sfxJump() { playTone(400, 'square', 0.2, 0.05); setTimeout(()=>playTone(600, 'square', 0.2, 0.05), 100); }
@@ -176,18 +160,31 @@ function startSiren() {
 }
 function stopSiren() { clearInterval(sirenInterval); sirenInterval = null; }
 
-/**
- * GAME ENGINE SETUP
- */
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d', { alpha: false }); // Optimize performance
 
-let W, H;
+/** * GAME ENGINE SETUP & RESIZING */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+let W, H, GROUND_Y;
 function resize() {
-    W = canvas.width = window.innerWidth;
-    H = canvas.height = window.innerHeight;
+    // Logical resolution
+    W = window.innerWidth;
+    H = window.innerHeight;
+    
+    // Dynamically calculate ground level every time the screen shifts
+    GROUND_Y = H * 0.8;
+    
+    // Retina / High-DPI screen scaling fix
+    let dpr = window.devicePixelRatio || 1;
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+    ctx.scale(dpr, dpr);
+    
+    // Keep pixels chunky, not blurry
+    ctx.imageSmoothingEnabled = false;
 }
 window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 100)); // Delay to allow iOS to catch up
 resize();
 
 // UI Elements
@@ -211,14 +208,9 @@ let highScore = localStorage.getItem('ambulanceHighScore') || 0;
 ui.hiMenu.innerText = highScore;
 
 // Game State
-let gameState = 'MENU'; // MENU, PLAYING, BOSS, TRANSITION, GAMEOVER
-let score = 0;
-let distance = 0;
-let frameCount = 0;
-let currentStage = 0;
-let globalSpeed = 6;
-let screenShake = 0;
-let bossTargetPoints = 1000; 
+let gameState = 'MENU';
+let score = 0, distance = 0, frameCount = 0, currentStage = 0;
+let globalSpeed = 6, screenShake = 0, bossTargetPoints = 1000; 
 let renderLoopStarted = false;
 
 const stages = [
@@ -229,67 +221,42 @@ const stages = [
     { name: "STAGE 5: VOLCANO", bg: "#2d0000", ground: "#1a0000", obs: "#333", fire: "#ff3f34", roof: "#ffb142" }
 ];
 
-// Entities
-let player;
-let entities = [];
-let particles = [];
-let projectiles = [];
-let floatingTexts = [];
-let boss = null;
-
-const GROUND_Y = H * 0.8;
+let player, entities = [], particles = [], projectiles = [], floatingTexts = [], boss = null;
 
 // Classes
 class Player {
     constructor() {
-        this.w = 80;
-        this.h = 50;
-        this.x = 100;
+        this.w = 80; this.h = 50;
+        this.x = 100; 
         this.y = GROUND_Y - this.h;
-        this.dy = 0;
-        this.gravity = 0.6;
-        this.jumpPower = -12;
-        this.jumps = 0;
-        this.maxJumps = 1;
-        this.lightTimer = 0;
+        this.dy = 0; this.gravity = 0.6; this.jumpPower = -12;
+        this.jumps = 0; this.maxJumps = 1; this.lightTimer = 0;
         
-        // Powerups (timer based, 0 means inactive)
-        this.p_multi = 0;
-        this.p_invinc = 0;
-        this.p_spread = 0;
-        this.p_ice = 0;
+        this.p_multi = 0; this.p_invinc = 0; this.p_spread = 0; this.p_ice = 0;
         this.multiplier = 1;
     }
-
     jump() {
         if (this.jumps < this.maxJumps) {
-            this.dy = this.jumpPower;
-            this.jumps++;
-            sfxJump();
+            this.dy = this.jumpPower; this.jumps++; sfxJump();
         }
     }
-
     shoot(angleUp = false) {
         let type = gameState === 'BOSS' ? 'nail' : (this.p_ice > 0 ? 'ice' : 'water');
-        let yOffset = gameState === 'BOSS' ? -15 : -10; // Roof shoots
-        
-        let vy = angleUp ? -6 : 0;
-        let vx = 12;
+        let yOffset = gameState === 'BOSS' ? -15 : -10;
+        let vy = angleUp ? -6 : 0, vx = 12;
         
         projectiles.push(new Projectile(this.x + this.w, this.y + yOffset, vx, vy, type));
-        
         if (this.p_spread > 0) {
             projectiles.push(new Projectile(this.x + this.w, this.y + yOffset - 10, vx, vy - 2, type));
             projectiles.push(new Projectile(this.x + this.w, this.y + yOffset + 10, vx, vy + 2, type));
         }
-        
         if(gameState === 'BOSS') sfxNail(); else sfxShoot();
     }
-
     update() {
         this.dy += this.gravity;
         this.y += this.dy;
 
+        // Dynamic ground check (auto corrects if screen resizes)
         if (this.y + this.h >= GROUND_Y) {
             this.y = GROUND_Y - this.h;
             this.dy = 0;
@@ -297,58 +264,30 @@ class Player {
         }
 
         this.lightTimer++;
-
-        // Powerup degredation
         if (this.p_invinc > 0) this.p_invinc--;
         if (this.p_spread > 0) this.p_spread--;
         if (this.p_ice > 0) this.p_ice--;
-        if (this.p_multi > 0) {
-            this.p_multi--;
-            this.multiplier = 2; // Simple 2x
-        } else {
-            this.multiplier = 1;
-            this.maxJumps = 1; // Double jump is tied to active multi/star for simplicity or logic
-        }
+        if (this.p_multi > 0) { this.p_multi--; this.multiplier = 2; } 
+        else { this.multiplier = 1; this.maxJumps = 1; }
     }
-
     draw() {
-        // Invincibility flash
         if (this.p_invinc > 0 && frameCount % 4 < 2) return;
-
-        // Base Ambulance
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(this.x, this.y, this.w, this.h);
         
-        // Red Cross
-        ctx.fillStyle = "#e74c3c";
-        ctx.fillRect(this.x + 30, this.y + 15, 20, 10);
-        ctx.fillRect(this.x + 35, this.y + 10, 10, 20);
-
-        // Wheels
-        ctx.fillStyle = "#111";
-        ctx.fillRect(this.x + 10, this.y + this.h - 5, 20, 10);
-        ctx.fillRect(this.x + 50, this.y + this.h - 5, 20, 10);
-
-        // Siren Light
-        ctx.fillStyle = Math.floor(this.lightTimer / 10) % 2 === 0 ? "red" : "blue";
-        ctx.fillRect(this.x + 20, this.y - 8, 15, 8);
-
-        // Abdul Roof
+        ctx.fillStyle = "#fff"; ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "#e74c3c"; ctx.fillRect(this.x + 30, this.y + 15, 20, 10); ctx.fillRect(this.x + 35, this.y + 10, 10, 20);
+        ctx.fillStyle = "#111"; ctx.fillRect(this.x + 10, this.y + this.h - 5, 20, 10); ctx.fillRect(this.x + 50, this.y + this.h - 5, 20, 10);
+        ctx.fillStyle = Math.floor(this.lightTimer / 10) % 2 === 0 ? "red" : "blue"; ctx.fillRect(this.x + 20, this.y - 8, 15, 8);
+        
         ctx.fillStyle = stages[currentStage % 5].roof;
-        ctx.fillRect(this.x + 50, this.y - 15, 15, 15); // Body
-        ctx.fillStyle = "#f1c40f";
-        ctx.fillRect(this.x + 52, this.y - 25, 10, 10); // Head
+        ctx.fillRect(this.x + 50, this.y - 15, 15, 15);
+        ctx.fillStyle = "#f1c40f"; ctx.fillRect(this.x + 52, this.y - 25, 10, 10);
     }
 }
 
 class Obstacle {
     constructor(type) {
-        this.x = W;
+        this.x = W; this.w = 30; this.h = 30; this.type = type; this.passed = false;
         this.y = GROUND_Y - 30;
-        this.w = 30;
-        this.h = 30;
-        this.type = type; // 'ground', 'air', 'powerup'
-        this.passed = false;
         
         if (type === 'air') {
             this.y = GROUND_Y - 60 - Math.random() * 40;
@@ -358,30 +297,22 @@ class Obstacle {
             this.w = 20; this.h = 20;
             const pTypes = ['spread', 'ice', 'jump', 'star', 'multi'];
             this.powerType = pTypes[Math.floor(Math.random() * pTypes.length)];
-            this.color = "#9b59b6"; // Purple crate
+            this.color = "#9b59b6";
         } else {
             this.color = stages[currentStage % 5].obs;
         }
     }
     update() {
         this.x -= globalSpeed;
-        
-        // Dodge points
-        if (!this.passed && this.x + this.w < player.x && this.type === 'ground') {
-            this.passed = true;
-            addScore(20);
-        }
+        if (!this.passed && this.x + this.w < player.x && this.type === 'ground') { this.passed = true; addScore(20); }
     }
     draw() {
         ctx.fillStyle = this.color;
         if(this.type === 'powerup') {
             ctx.fillRect(this.x, this.y, this.w, this.h);
-            ctx.strokeStyle = "#fff";
-            ctx.strokeRect(this.x, this.y, this.w, this.h);
+            ctx.strokeStyle = "#fff"; ctx.strokeRect(this.x, this.y, this.w, this.h);
         } else if (this.type === 'air') {
-            ctx.beginPath();
-            ctx.arc(this.x + this.w/2, this.y + this.h/2, this.w/2, 0, Math.PI*2);
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(this.x + this.w/2, this.y + this.h/2, this.w/2, 0, Math.PI*2); ctx.fill();
         } else {
             ctx.fillRect(this.x, this.y, this.w, this.h);
         }
@@ -390,111 +321,69 @@ class Obstacle {
 
 class Boss {
     constructor() {
-        this.w = 80;
-        this.h = 100;
-        this.x = W + 100; // Slide in
+        this.w = 80; this.h = 100; this.x = W + 100;
         this.y = GROUND_Y - this.h;
-        this.hp = 3 + (currentStage * 2);
-        this.maxHp = this.hp;
-        this.state = 'entering';
-        this.throwTimer = 0;
+        this.hp = 3 + (currentStage * 2); this.maxHp = this.hp;
+        this.state = 'entering'; this.throwTimer = 0;
     }
     update() {
         if (this.state === 'entering') {
-            this.x -= 2;
-            if (this.x <= W - 150) this.state = 'active';
+            this.x -= 2; if (this.x <= W - 150) this.state = 'active';
         } else if (this.state === 'active') {
-            // Hover up and down
+            // Dynamic Y based on screen size
             this.y = GROUND_Y - this.h + Math.sin(frameCount * 0.05) * 20;
-            
             this.throwTimer++;
-            let attackRate = Math.max(40, 100 - (currentStage * 10)); // Gets faster
-            
-            if (this.throwTimer > attackRate) {
-                this.throwTimer = 0;
-                this.throwTank();
-            }
+            let attackRate = Math.max(40, 100 - (currentStage * 10));
+            if (this.throwTimer > attackRate) { this.throwTimer = 0; this.throwTank(); }
         }
     }
     throwTank() {
-        // Stage 1: Fastball, Stage 2: +Bouncer, Stage 3: +Raindrop
-        let r = Math.random();
-        let type = 'fastball';
-        
+        let r = Math.random(), type = 'fastball';
         if (currentStage >= 1 && r > 0.4) type = 'bouncer';
         if (currentStage >= 2 && r > 0.7) type = 'raindrop';
         if (currentStage >= 4 && r > 0.9) {
-            // Double throw
             entities.push(new GasTank('fastball', this.x, this.y));
             setTimeout(() => entities.push(new GasTank('bouncer', this.x, this.y)), 300);
             return;
         }
-
         entities.push(new GasTank(type, this.x, this.y + 20));
     }
     draw() {
-        // Boss body
-        ctx.fillStyle = "#2c3e50";
-        ctx.fillRect(this.x, this.y, this.w, this.h);
-        // Face
-        ctx.fillStyle = "#ecf0f1";
-        ctx.fillRect(this.x + 10, this.y + 10, 60, 40);
-        // Eyes
-        ctx.fillStyle = "#c0392b";
-        ctx.fillRect(this.x + 20, this.y + 20, 15, 10);
-        ctx.fillRect(this.x + 45, this.y + 20, 15, 10);
-        
-        // Flashing when hurt
+        ctx.fillStyle = "#2c3e50"; ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "#ecf0f1"; ctx.fillRect(this.x + 10, this.y + 10, 60, 40);
+        ctx.fillStyle = "#c0392b"; ctx.fillRect(this.x + 20, this.y + 20, 15, 10); ctx.fillRect(this.x + 45, this.y + 20, 15, 10);
         if (this.hurtFlash > 0) {
-            ctx.fillStyle = "rgba(255,255,255,0.8)";
-            ctx.fillRect(this.x, this.y, this.w, this.h);
-            this.hurtFlash--;
+            ctx.fillStyle = "rgba(255,255,255,0.8)"; ctx.fillRect(this.x, this.y, this.w, this.h); this.hurtFlash--;
         }
     }
 }
 
 class GasTank {
     constructor(type, x, y) {
-        this.x = x; this.y = y;
-        this.w = 30; this.h = 15;
-        this.type = type; // fastball, bouncer, raindrop
-        
+        this.x = x; this.y = y; this.w = 30; this.h = 15; this.type = type;
         if (type === 'fastball') { this.dx = -9 - currentStage; this.dy = 0; this.g = 0; }
         else if (type === 'bouncer') { this.dx = -6 - currentStage; this.dy = -2; this.g = 0.4; }
         else if (type === 'raindrop') { this.dx = -3; this.dy = -15; this.g = 0.3; }
-        
         this.isIce = currentStage >= 2;
     }
     update() {
-        this.x += this.dx;
-        this.dy += this.g;
-        this.y += this.dy;
-
+        this.x += this.dx; this.dy += this.g; this.y += this.dy;
         if (this.y + this.h >= GROUND_Y && this.type === 'bouncer') {
-            this.y = GROUND_Y - this.h;
-            this.dy = -8; // Bounce
+            this.y = GROUND_Y - this.h; this.dy = -8;
         }
     }
     draw() {
-        ctx.fillStyle = this.isIce ? "#7ed6df" : "#7f8c8d";
-        ctx.fillRect(this.x, this.y, this.w, this.h);
-        ctx.fillStyle = "#c0392b"; // Red tip
-        ctx.fillRect(this.x - 5, this.y + 2, 5, 11);
+        ctx.fillStyle = this.isIce ? "#7ed6df" : "#7f8c8d"; ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "#c0392b"; ctx.fillRect(this.x - 5, this.y + 2, 5, 11);
     }
 }
 
 class Projectile {
     constructor(x, y, dx, dy, type) {
         this.x = x; this.y = y; this.dx = dx; this.dy = dy; this.type = type;
-        this.w = type === 'nail' ? 10 : 20;
-        this.h = type === 'nail' ? 4 : 8;
-        this.active = true;
+        this.w = type === 'nail' ? 10 : 20; this.h = type === 'nail' ? 4 : 8; this.active = true;
     }
-    update() {
-        this.x += this.dx;
-        this.y += this.dy;
-        if(this.x > W || this.y < 0) this.active = false;
-    }
+    update() { this.x += this.dx; this.y += this.dy; if(this.x > W || this.y < 0) this.active = false; }
     draw() {
         ctx.fillStyle = this.type === 'water' ? "#3498db" : (this.type === 'ice' ? "#00ffff" : "#bdc3c7");
         ctx.fillRect(this.x, this.y, this.w, this.h);
@@ -503,182 +392,100 @@ class Projectile {
 
 class Particle {
     constructor(x, y, color) {
-        this.x = x; this.y = y;
-        this.dx = (Math.random() - 0.5) * 10;
-        this.dy = (Math.random() - 0.5) * 10;
-        this.life = 1.0;
-        this.color = color;
-        this.size = Math.random() * 6 + 2;
+        this.x = x; this.y = y; this.dx = (Math.random() - 0.5) * 10; this.dy = (Math.random() - 0.5) * 10;
+        this.life = 1.0; this.color = color; this.size = Math.random() * 6 + 2;
     }
-    update() {
-        this.x += this.dx; this.y += this.dy;
-        this.life -= 0.05;
-    }
+    update() { this.x += this.dx; this.y += this.dy; this.life -= 0.05; }
     draw() {
-        ctx.globalAlpha = Math.max(0, this.life);
-        ctx.fillStyle = this.color;
-        ctx.fillRect(this.x, this.y, this.size, this.size);
-        ctx.globalAlpha = 1.0;
+        ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size); ctx.globalAlpha = 1.0;
     }
 }
 
 class FloatingText {
     constructor(x, y, text, color) {
-        this.x = x; this.y = y; this.text = text; this.color = color;
-        this.life = 1.0; this.dy = -2;
+        this.x = x; this.y = y; this.text = text; this.color = color; this.life = 1.0; this.dy = -2;
     }
     update() { this.y += this.dy; this.life -= 0.02; }
     draw() {
-        ctx.globalAlpha = Math.max(0, this.life);
-        ctx.fillStyle = this.color;
-        ctx.font = "12px 'Press Start 2P'";
-        ctx.fillText(this.text, this.x, this.y);
-        ctx.globalAlpha = 1.0;
+        ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color;
+        ctx.font = "12px 'Press Start 2P'"; ctx.fillText(this.text, this.x, this.y); ctx.globalAlpha = 1.0;
     }
 }
 
-// Logic Utils
-function spawnParticles(x, y, color, count=10) {
-    for(let i=0; i<count; i++) particles.push(new Particle(x, y, color));
-}
-function addScore(pts) {
-    score += pts * player.multiplier;
-    ui.score.innerText = Math.floor(score).toString().padStart(6, '0');
-}
+// Utils
+function spawnParticles(x, y, color, count=10) { for(let i=0; i<count; i++) particles.push(new Particle(x, y, color)); }
+function addScore(pts) { score += pts * player.multiplier; ui.score.innerText = Math.floor(score).toString().padStart(6, '0'); }
 function shake(amt) { screenShake = amt; }
-
 function checkCollision(r1, r2) {
-    // slightly forgiving hitbox
-    let padding = 5;
-    return !(r2.x > r1.x + r1.w - padding || 
-             r2.x + r2.w < r1.x + padding || 
-             r2.y > r1.y + r1.h - padding ||
-             r2.y + r2.h < r1.y + padding);
+    let pad = 5;
+    return !(r2.x > r1.x + r1.w - pad || r2.x + r2.w < r1.x + pad || r2.y > r1.y + r1.h - pad || r2.y + r2.h < r1.y + pad);
 }
 
-// Main Game Logic Loop
+// Logic Loop
 function update() {
     if (gameState === 'MENU' || gameState === 'GAMEOVER') return;
-
     frameCount++;
-    
-    // Physics & movement
     player.update();
     
     if (gameState === 'PLAYING') {
-        distance += (globalSpeed / 60);
-        ui.dist.innerText = Math.floor(distance) + 'm';
-        addScore(0.1); // Passive score
-
-        // Spawner
+        distance += (globalSpeed / 60); ui.dist.innerText = Math.floor(distance) + 'm'; addScore(0.1);
         if (frameCount % 70 === 0) {
             let r = Math.random();
             if (r < 0.1) entities.push(new Obstacle('powerup'));
-            else if (r < 0.4) entities.push(new Obstacle('air')); // Fireball
+            else if (r < 0.4) entities.push(new Obstacle('air'));
             else entities.push(new Obstacle('ground'));
         }
-
-        // Increase speed slightly over time
         if(frameCount % 600 === 0 && globalSpeed < 15) globalSpeed += 0.5;
 
-        // Boss Trigger
         if (score >= bossTargetPoints) {
-            gameState = 'BOSS';
-            boss = new Boss();
-            ui.bossHp.classList.remove('hidden');
-            ui.stage.innerText = "WARNING: BOSS!";
-            ui.stage.style.color = "#fff";
-            entities = []; // Clear field
+            gameState = 'BOSS'; boss = new Boss();
+            ui.bossHp.classList.remove('hidden'); ui.stage.innerText = "WARNING: BOSS!"; ui.stage.style.color = "#fff";
+            entities = [];
         }
     }
 
-    if (gameState === 'BOSS') {
-        boss.update();
-        ui.bossHp.innerText = `BOSS HP: ${boss.hp}`;
-    }
+    if (gameState === 'BOSS') { boss.update(); ui.bossHp.innerText = `BOSS HP: ${boss.hp}`; }
 
-    // Entity Updates
     for (let i = entities.length - 1; i >= 0; i--) {
-        let e = entities[i];
-        e.update();
+        let e = entities[i]; e.update();
 
-        // Projectile collisions with enemies
         for (let j = projectiles.length - 1; j >= 0; j--) {
             let p = projectiles[j];
             if (p.active && checkCollision(p, e)) {
-                if (e.type === 'air') { // Hit fireball
-                    addScore(100);
-                    spawnParticles(e.x, e.y, e.color, 15);
-                    sfxExplosion();
+                if (e.type === 'air') {
+                    addScore(100); spawnParticles(e.x, e.y, e.color, 15); sfxExplosion();
                     floatingTexts.push(new FloatingText(e.x, e.y, "+100", "#e74c3c"));
-                    entities.splice(i, 1);
-                    p.active = false;
-                    break;
+                    entities.splice(i, 1); p.active = false; break;
                 } else if (e instanceof GasTank && p.type === 'nail') {
-                    spawnParticles(e.x, e.y, "#fff", 20);
-                    sfxExplosion();
-                    shake(5);
-                    boss.hp--;
-                    boss.hurtFlash = 5;
-                    sfxBossHit();
-                    entities.splice(i, 1);
-                    p.active = false;
-                    
-                    if (boss.hp <= 0) {
-                        defeatBoss();
-                    }
+                    spawnParticles(e.x, e.y, "#fff", 20); sfxExplosion(); shake(5);
+                    boss.hp--; boss.hurtFlash = 5; sfxBossHit();
+                    entities.splice(i, 1); p.active = false;
+                    if (boss.hp <= 0) defeatBoss();
                     break;
                 }
             }
         }
 
-        if (e.x + e.w < 0) {
-            entities.splice(i, 1); // Clean up off screen
-        } else if (checkCollision(player, e)) {
-            if (e.type === 'powerup') {
-                activatePowerup(e.powerType);
-                entities.splice(i, 1);
-                sfxPowerup();
-            } else if (player.p_invinc > 0) {
-                // Destroy obstacle
-                spawnParticles(e.x, e.y, "#fff", 20);
-                sfxExplosion();
-                entities.splice(i, 1);
-                addScore(50);
-            } else {
-                gameOver();
-            }
+        if (e.x + e.w < 0) entities.splice(i, 1);
+        else if (checkCollision(player, e)) {
+            if (e.type === 'powerup') { activatePowerup(e.powerType); entities.splice(i, 1); sfxPowerup(); }
+            else if (player.p_invinc > 0) { spawnParticles(e.x, e.y, "#fff", 20); sfxExplosion(); entities.splice(i, 1); addScore(50); }
+            else gameOver();
         } else if (e instanceof GasTank && e.y + e.h >= GROUND_Y && e.type !== 'bouncer') {
-            // Gas tank hit ground and exploded
-            spawnParticles(e.x, e.y, "#e74c3c", 20);
-            sfxExplosion();
-            shake(10);
-            entities.splice(i, 1);
-            if (e.isIce) {
-                // Ice shrapnel creates a ground obstacle
-                let ice = new Obstacle('ground');
-                ice.x = e.x; ice.color = "#00ffff";
-                entities.push(ice);
-            }
+            spawnParticles(e.x, e.y, "#e74c3c", 20); sfxExplosion(); shake(10); entities.splice(i, 1);
+            if (e.isIce) { let ice = new Obstacle('ground'); ice.x = e.x; ice.color = "#00ffff"; entities.push(ice); }
         }
     }
 
-    // Projectile cleanup
-    projectiles.forEach(p => p.update());
-    projectiles = projectiles.filter(p => p.active);
-
-    // Particles & Text cleanup
-    particles.forEach(p => p.update());
-    particles = particles.filter(p => p.life > 0);
-    floatingTexts.forEach(t => t.update());
-    floatingTexts = floatingTexts.filter(t => t.life > 0);
-    
+    projectiles.forEach(p => p.update()); projectiles = projectiles.filter(p => p.active);
+    particles.forEach(p => p.update()); particles = particles.filter(p => p.life > 0);
+    floatingTexts.forEach(t => t.update()); floatingTexts = floatingTexts.filter(t => t.life > 0);
     updatePowerupDisplay();
 }
 
 function activatePowerup(type) {
-    let dur = 600; // 10 seconds at 60fps
-    let msg = "";
+    let dur = 600, msg = "";
     switch(type) {
         case 'spread': player.p_spread = dur; msg = "TRIPLE SHOOT!"; break;
         case 'ice': player.p_ice = dur; msg = "ICE HOSE!"; break;
@@ -690,206 +497,110 @@ function activatePowerup(type) {
 }
 
 function updatePowerupDisplay() {
-    let statuses = [];
-    if(player.p_invinc > 0) statuses.push("STAR");
-    if(player.p_spread > 0) statuses.push("SPREAD");
-    if(player.p_ice > 0) statuses.push("ICE");
-    if(player.p_multi > 0) statuses.push("2X");
-    if(player.maxJumps > 1) statuses.push("D-JUMP");
-    ui.power.innerText = statuses.join(" | ");
+    let st = [];
+    if(player.p_invinc > 0) st.push("STAR");
+    if(player.p_spread > 0) st.push("SPREAD");
+    if(player.p_ice > 0) st.push("ICE");
+    if(player.p_multi > 0) st.push("2X");
+    if(player.maxJumps > 1) st.push("D-JUMP");
+    ui.power.innerText = st.join(" | ");
 }
 
 function defeatBoss() {
-    gameState = 'TRANSITION';
-    ui.bossHp.classList.add('hidden');
-    spawnParticles(boss.x, boss.y, "#f1c40f", 100);
-    shake(20);
-    sfxExplosion();
+    gameState = 'TRANSITION'; ui.bossHp.classList.add('hidden');
+    spawnParticles(boss.x, boss.y, "#f1c40f", 100); shake(20); sfxExplosion();
     
-    // Animate Boss flying away
-    let flyY = boss.y;
     let flyTimer = setInterval(() => {
-        boss.y -= 10;
-        boss.x += 5;
-        draw(); // Force draw during transition
+        boss.y -= 10; boss.x += 5; draw();
         if (boss.y < -200) {
-            clearInterval(flyTimer);
-            currentStage++;
-            bossTargetPoints += 1000 + (currentStage * 500); // Next boss harder
-            boss = null;
-            globalSpeed += 1; // Faster next stage
-            ui.stage.innerText = stages[currentStage % 5].name;
-            ui.stage.style.color = stages[currentStage % 5].fire;
+            clearInterval(flyTimer); currentStage++;
+            bossTargetPoints += 1000 + (currentStage * 500); boss = null; globalSpeed += 1;
+            ui.stage.innerText = stages[currentStage % 5].name; ui.stage.style.color = stages[currentStage % 5].fire;
             gameState = 'PLAYING';
         }
     }, 16);
 }
 
 function draw() {
-    // Stage colors
     let stg = stages[currentStage % 5];
-    ctx.fillStyle = stg.bg;
-    ctx.fillRect(0, 0, W, H);
-
+    ctx.fillStyle = stg.bg; ctx.fillRect(0, 0, W, H);
     ctx.save();
     
-    // Screen shake
     if (screenShake > 0) {
-        let dx = (Math.random() - 0.5) * screenShake;
-        let dy = (Math.random() - 0.5) * screenShake;
-        ctx.translate(dx, dy);
-        screenShake *= 0.9;
-        if (screenShake < 0.5) screenShake = 0;
+        ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
+        screenShake *= 0.9; if (screenShake < 0.5) screenShake = 0;
     }
 
-    // Grid / Parallax background (simple lines)
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255,255,255,0.05)"; ctx.lineWidth = 2;
     let offset = (distance * 10) % 100;
     for(let i = -100; i < W; i+= 100) {
         ctx.beginPath();
-        let drawX = i;
-        if(gameState === 'PLAYING') drawX -= offset;
-        ctx.moveTo(drawX, 0);
-        ctx.lineTo(drawX, GROUND_Y);
-        ctx.stroke();
+        let drawX = i; if(gameState === 'PLAYING') drawX -= offset;
+        ctx.moveTo(drawX, 0); ctx.lineTo(drawX, GROUND_Y); ctx.stroke();
     }
 
-    // Ground
-    ctx.fillStyle = stg.ground;
-    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
-    
-    // Ground detail line
-    ctx.fillStyle = stg.obs;
-    ctx.fillRect(0, GROUND_Y, W, 5);
+    ctx.fillStyle = stg.ground; ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    ctx.fillStyle = stg.obs; ctx.fillRect(0, GROUND_Y, W, 5);
 
-    if (player) player.draw();
-    if (boss) boss.draw();
-    
-    entities.forEach(e => e.draw());
-    projectiles.forEach(p => p.draw());
-    particles.forEach(p => p.draw());
-    floatingTexts.forEach(t => t.draw());
-
+    if (player) player.draw(); if (boss) boss.draw();
+    entities.forEach(e => e.draw()); projectiles.forEach(p => p.draw());
+    particles.forEach(p => p.draw()); floatingTexts.forEach(t => t.draw());
     ctx.restore();
 }
 
-function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
-}
+function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
 
-// Game Flow controls
 function startGame(e) {
-    // Prevent event from bubbling up and immediately triggering a jump on touch devices
-    if(e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
+    if(e) { e.preventDefault(); e.stopPropagation(); }
+    initAudio();
+    ui.start.classList.add('hidden'); ui.over.classList.add('hidden'); ui.hud.classList.remove('hidden');
     
-    initAudio(); // Initialize audio context on first user interaction
-    
-    ui.start.classList.add('hidden');
-    ui.over.classList.add('hidden');
-    ui.hud.classList.remove('hidden');
+    // Crucial: ensure resize has the absolute latest dimensions before placing player
+    resize(); 
     
     player = new Player();
-    entities = [];
-    projectiles = [];
-    particles = [];
-    floatingTexts = [];
-    score = 0;
-    distance = 0;
-    frameCount = 0;
-    currentStage = 0;
-    globalSpeed = 8;
-    bossTargetPoints = 1000;
-    boss = null;
-    gameState = 'PLAYING';
+    entities = []; projectiles = []; particles = []; floatingTexts = [];
+    score = 0; distance = 0; frameCount = 0; currentStage = 0; globalSpeed = 8;
+    bossTargetPoints = 1000; boss = null; gameState = 'PLAYING';
     
-    ui.stage.innerText = stages[0].name;
-    ui.stage.style.color = stages[0].fire;
-    
+    ui.stage.innerText = stages[0].name; ui.stage.style.color = stages[0].fire;
     startSiren();
-    
-    if(!renderLoopStarted) {
-        renderLoopStarted = true;
-        requestAnimationFrame(gameLoop);
-    }
+    if(!renderLoopStarted) { renderLoopStarted = true; requestAnimationFrame(gameLoop); }
 }
 
 function gameOver() {
-    gameState = 'GAMEOVER';
-    stopSiren();
-    shake(15);
-    sfxExplosion();
+    gameState = 'GAMEOVER'; stopSiren(); shake(15); sfxExplosion();
     spawnParticles(player.x + player.w/2, player.y + player.h/2, "#e74c3c", 50);
-    
-    if (score > highScore) {
-        highScore = Math.floor(score);
-        localStorage.setItem('ambulanceHighScore', highScore);
-    }
-    
-    ui.hud.classList.add('hidden');
-    ui.over.classList.remove('hidden');
-    document.getElementById('finalScore').innerText = Math.floor(score);
-    ui.hiEnd.innerText = highScore;
+    if (score > highScore) { highScore = Math.floor(score); localStorage.setItem('ambulanceHighScore', highScore); }
+    ui.hud.classList.add('hidden'); ui.over.classList.remove('hidden');
+    document.getElementById('finalScore').innerText = Math.floor(score); ui.hiEnd.innerText = highScore;
 }
 
-// Inputs
 function handleInput(e, isTouch = false) {
     if(gameState !== 'PLAYING' && gameState !== 'BOSS') return;
-    
     let x, y;
     if (isTouch) {
-        // Prevent default zoom/scroll on canvas
         e.preventDefault(); 
-        if(e.changedTouches && e.changedTouches.length > 0) {
-            x = e.changedTouches[0].clientX;
-            y = e.changedTouches[0].clientY;
-        } else {
-            return;
-        }
+        if(e.changedTouches && e.changedTouches.length > 0) { x = e.changedTouches[0].clientX; y = e.changedTouches[0].clientY; }
+        else return;
     } else {
-        // Keyboard mapping: Space = Jump, F = Shoot straight, G = Shoot Up
         if (e.code === 'Space') { player.jump(); return; }
         if (e.code === 'KeyF') { player.shoot(false); return; }
         if (e.code === 'KeyG') { player.shoot(true); return; }
-        return; // Ignore other keys
+        return; 
     }
-
-    if (x < W / 2) {
-        player.jump();
-    } else {
-        if (y < H / 2) player.shoot(true); // Top right = 45 deg
-        else player.shoot(false); // Bottom right = straight
-    }
+    if (x < W / 2) player.jump();
+    else if (y < H / 2) player.shoot(true); 
+    else player.shoot(false); 
 }
 
-// Ensure buttons capture both click and touch events correctly
-['click', 'touchstart'].forEach(evt => {
-    ui.startBtn.addEventListener(evt, startGame, {passive: false});
-    ui.restartBtn.addEventListener(evt, startGame, {passive: false});
-});
-
-// Canvas input listeners
+['click', 'touchstart'].forEach(evt => { ui.startBtn.addEventListener(evt, startGame, {passive: false}); ui.restartBtn.addEventListener(evt, startGame, {passive: false}); });
 canvas.addEventListener('touchstart', (e) => handleInput(e, true), {passive: false});
 window.addEventListener('keydown', (e) => handleInput(e, false));
+window.oncontextmenu = function(e) { e.preventDefault(); e.stopPropagation(); return false; };
 
-// Prevent context menu on long press
-window.oncontextmenu = function(event) {
-     event.preventDefault();
-     event.stopPropagation();
-     return false;
-};
-
-// Initial draw to populate background before game starts
 draw();
-if(!renderLoopStarted) {
-    renderLoopStarted = true;
-    requestAnimationFrame(gameLoop);
-}
+if(!renderLoopStarted) { renderLoopStarted = true; requestAnimationFrame(gameLoop); }
 
 </script>
 </body>
