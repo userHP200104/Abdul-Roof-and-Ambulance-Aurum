@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Ambulance Aurum & Abdul Roof</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background-color: #000; overflow: hidden;
+            font-family: 'Press Start 2P', monospace;
+            touch-action: none; /* Prevents pull-to-refresh on iOS */
+            user-select: none;
+            color: #fff;
+        }
+        
+        #gameCanvas {
+            display: block; width: 100%; height: 100%;
+        }
+
+        /* UI Overlays */
+        .overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(0, 0, 0, 0.85); z-index: 10; text-align: center;
+        }
+        
+        h1 {
+            font-size: 24px; text-shadow: 4px 4px 0px #e74c3c; line-height: 1.5; margin-bottom: 10px;
+            padding: 0 20px;
+        }
+        
+        .btn {
+            background: #f1c40f; color: #000; border: 4px solid #fff;
+            padding: 15px 30px; font-size: 18px; font-family: inherit;
+            cursor: pointer; text-transform: uppercase; margin-top: 20px;
+            box-shadow: 4px 4px 0px #fff;
+        }
+        .btn:active { box-shadow: 0px 0px 0px #fff; transform: translate(4px, 4px); }
+
+        .stats { margin-top: 20px; font-size: 14px; color: #3498db; }
+        .controls-hint { margin-top: 40px; font-size: 10px; color: #aaa; line-height: 1.8; max-width: 80%; }
+
+        /* HUD */
+        #hud {
+            position: absolute; top: 0; left: 0; width: 100%; padding: 15px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            pointer-events: none; z-index: 5; text-shadow: 2px 2px 0px #000;
+        }
+        
+        .hud-left { display: flex; flex-direction: column; gap: 8px; }
+        .hud-right { text-align: right; font-size: 12px; color: #f1c40f; }
+        #scoreDisplay { font-size: 20px; color: #2ecc71; }
+        #distDisplay { font-size: 12px; color: #fff; }
+        #stageDisplay { font-size: 12px; margin-top: 5px; color: #e74c3c; animation: blink 1s infinite; }
+        #powerupDisplay { font-size: 12px; color: #9b59b6; margin-top: 5px; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        
+        .hidden { display: none !important; }
+        
+        /* Mobile orientation warning */
+        #orientationWarning {
+            display: none; background: #000; z-index: 999;
+        }
+        @media screen and (orientation: portrait) {
+            #orientationWarning { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="hud" class="hidden">
+        <div class="hud-left">
+            <div id="scoreDisplay">000000</div>
+            <div id="distDisplay">0m</div>
+            <div id="powerupDisplay"></div>
+        </div>
+        <div class="hud-right">
+            <div id="stageDisplay">STAGE 1: CITY</div>
+            <div id="bossHpDisplay" class="hidden">BOSS HP: 3</div>
+        </div>
+    </div>
+
+    <div id="startScreen" class="overlay">
+        <h1>AMBULANCE AURUM<br>& ABDUL ROOF</h1>
+        <div class="stats">HIGH SCORE: <span id="hiScoreMenu">0</span></div>
+        <button class="btn" id="startBtn">START WEE WOO</button>
+        <div class="controls-hint">
+            TAP LEFT HALF: Jump / Double Jump<br>
+            TAP BOTTOM RIGHT: Shoot Straight<br>
+            TAP TOP RIGHT: Shoot 45&deg; Up
+        </div>
+    </div>
+
+    <div id="gameOverScreen" class="overlay hidden">
+        <h1 style="color: #e74c3c; text-shadow: 4px 4px 0px #fff;">CRASHED!</h1>
+        <div class="stats" style="color: #fff; font-size: 18px;">SCORE: <span id="finalScore">0</span></div>
+        <div class="stats">HIGH SCORE: <span id="hiScoreEnd">0</span></div>
+        <button class="btn" id="restartBtn">TRY AGAIN</button>
+    </div>
+
+    <div id="orientationWarning" class="overlay">
+        <h2 style="color: yellow; text-align:center; padding: 20px;">PLEASE ROTATE<br>YOUR PHONE<br>TO LANDSCAPE</h2>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+/** * AUDIO SYNTH ENGINE 
+ * Generates retro sound effects dynamically.
+ */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+let sirenInterval = null;
+let sirenToggle = false;
+
+function playTone(freq, type, duration, vol=0.1) {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    
+    gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+    
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + duration);
+}
+
+function sfxJump() { playTone(400, 'square', 0.2, 0.05); setTimeout(()=>playTone(600, 'square', 0.2, 0.05), 100); }
+function sfxShoot() { playTone(800, 'sawtooth', 0.1, 0.05); }
+function sfxNail() { playTone(1200, 'square', 0.05, 0.05); }
+function sfxExplosion() { playTone(100, 'sawtooth', 0.5, 0.2); setTimeout(()=>playTone(50, 'square', 0.4, 0.2), 50); }
+function sfxPowerup() { playTone(800, 'sine', 0.1, 0.1); setTimeout(()=>playTone(1200, 'sine', 0.2, 0.1), 100); }
+function sfxBossHit() { playTone(200, 'square', 0.2, 0.1); }
+
+function startSiren() {
+    if(sirenInterval) clearInterval(sirenInterval);
+    sirenInterval = setInterval(() => {
+        if(gameState !== 'PLAYING' && gameState !== 'BOSS') return;
+        sirenToggle = !sirenToggle;
+        playTone(sirenToggle ? 600 : 800, 'sine', 0.4, 0.02);
+    }, 400);
+}
+function stopSiren() { clearInterval(sirenInterval); sirenInterval = null; }
+
+/**
+ * GAME ENGINE SETUP
+ */
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d', { alpha: false }); // Optimize performance
+
+let W, H;
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// UI Elements
+const ui = {
+    start: document.getElementById('startScreen'),
+    over: document.getElementById('gameOverScreen'),
+    hud: document.getElementById('hud'),
+    score: document.getElementById('scoreDisplay'),
+    dist: document.getElementById('distDisplay'),
+    stage: document.getElementById('stageDisplay'),
+    bossHp: document.getElementById('bossHpDisplay'),
+    power: document.getElementById('powerupDisplay'),
+    hiMenu: document.getElementById('hiScoreMenu'),
+    hiEnd: document.getElementById('hiScoreEnd')
+};
+
+// Storage
+let highScore = localStorage.getItem('ambulanceHighScore') || 0;
+ui.hiMenu.innerText = highScore;
+
+// Game State
+let gameState = 'MENU'; // MENU, PLAYING, BOSS, TRANSITION, GAMEOVER
+let score = 0;
+let distance = 0;
+let frameCount = 0;
+let currentStage = 0;
+let globalSpeed = 6;
+let screenShake = 0;
+let bossTargetPoints = 1000; 
+
+const stages = [
+    { name: "STAGE 1: CITY", bg: "#1a1a2e", ground: "#16213e", obs: "#95a5a6", fire: "#e67e22", roof: "#3498db" },
+    { name: "STAGE 2: DESERT", bg: "#8a3c0f", ground: "#d35400", obs: "#5c3a21", fire: "#f1c40f", roof: "#e74c3c" },
+    { name: "STAGE 3: TUNDRA", bg: "#1e3799", ground: "#4a69bd", obs: "#dff9fb", fire: "#7ed6df", roof: "#ecf0f1" },
+    { name: "STAGE 4: CYBER", bg: "#2c003e", ground: "#510a32", obs: "#00ffcc", fire: "#ff007f", roof: "#f368e0" },
+    { name: "STAGE 5: VOLCANO", bg: "#2d0000", ground: "#1a0000", obs: "#333", fire: "#ff3f34", roof: "#ffb142" }
+];
+
+// Entities
+let player;
+let entities = [];
+let particles = [];
+let projectiles = [];
+let floatingTexts = [];
+let boss = null;
+
+const GROUND_Y = H * 0.8;
+
+// Classes
+class Player {
+    constructor() {
+        this.w = 80;
+        this.h = 50;
+        this.x = 100;
+        this.y = GROUND_Y - this.h;
+        this.dy = 0;
+        this.gravity = 0.6;
+        this.jumpPower = -12;
+        this.jumps = 0;
+        this.maxJumps = 1;
+        this.lightTimer = 0;
+        
+        // Powerups (timer based, 0 means inactive)
+        this.p_multi = 0;
+        this.p_invinc = 0;
+        this.p_spread = 0;
+        this.p_ice = 0;
+        this.multiplier = 1;
+    }
+
+    jump() {
+        if (this.jumps < this.maxJumps) {
+            this.dy = this.jumpPower;
+            this.jumps++;
+            sfxJump();
+        }
+    }
+
+    shoot(angleUp = false) {
+        let type = gameState === 'BOSS' ? 'nail' : (this.p_ice > 0 ? 'ice' : 'water');
+        let yOffset = gameState === 'BOSS' ? -15 : -10; // Roof shoots
+        
+        let vy = angleUp ? -6 : 0;
+        let vx = 12;
+        
+        projectiles.push(new Projectile(this.x + this.w, this.y + yOffset, vx, vy, type));
+        
+        if (this.p_spread > 0) {
+            projectiles.push(new Projectile(this.x + this.w, this.y + yOffset - 10, vx, vy - 2, type));
+            projectiles.push(new Projectile(this.x + this.w, this.y + yOffset + 10, vx, vy + 2, type));
+        }
+        
+        if(gameState === 'BOSS') sfxNail(); else sfxShoot();
+    }
+
+    update() {
+        this.dy += this.gravity;
+        this.y += this.dy;
+
+        if (this.y + this.h >= GROUND_Y) {
+            this.y = GROUND_Y - this.h;
+            this.dy = 0;
+            this.jumps = 0;
+        }
+
+        this.lightTimer++;
+
+        // Powerup degredation
+        if (this.p_invinc > 0) this.p_invinc--;
+        if (this.p_spread > 0) this.p_spread--;
+        if (this.p_ice > 0) this.p_ice--;
+        if (this.p_multi > 0) {
+            this.p_multi--;
+            this.multiplier = 2; // Simple 2x
+        } else {
+            this.multiplier = 1;
+            this.maxJumps = 1; // Double jump is tied to active multi/star for simplicity or logic
+        }
+    }
+
+    draw() {
+        // Invincibility flash
+        if (this.p_invinc > 0 && frameCount % 4 < 2) return;
+
+        // Base Ambulance
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        
+        // Red Cross
+        ctx.fillStyle = "#e74c3c";
+        ctx.fillRect(this.x + 30, this.y + 15, 20, 10);
+        ctx.fillRect(this.x + 35, this.y + 10, 10, 20);
+
+        // Wheels
+        ctx.fillStyle = "#111";
+        ctx.fillRect(this.x + 10, this.y + this.h - 5, 20, 10);
+        ctx.fillRect(this.x + 50, this.y + this.h - 5, 20, 10);
+
+        // Siren Light
+        ctx.fillStyle = Math.floor(this.lightTimer / 10) % 2 === 0 ? "red" : "blue";
+        ctx.fillRect(this.x + 20, this.y - 8, 15, 8);
+
+        // Abdul Roof
+        ctx.fillStyle = stages[currentStage % 5].roof;
+        ctx.fillRect(this.x + 50, this.y - 15, 15, 15); // Body
+        ctx.fillStyle = "#f1c40f";
+        ctx.fillRect(this.x + 52, this.y - 25, 10, 10); // Head
+    }
+}
+
+class Obstacle {
+    constructor(type) {
+        this.x = W;
+        this.y = GROUND_Y - 30;
+        this.w = 30;
+        this.h = 30;
+        this.type = type; // 'ground', 'air', 'powerup'
+        this.passed = false;
+        
+        if (type === 'air') {
+            this.y = GROUND_Y - 60 - Math.random() * 40;
+            this.color = stages[currentStage % 5].fire;
+        } else if (type === 'powerup') {
+            this.y = GROUND_Y - 40 - Math.random() * 60;
+            this.w = 20; this.h = 20;
+            const pTypes = ['spread', 'ice', 'jump', 'star', 'multi'];
+            this.powerType = pTypes[Math.floor(Math.random() * pTypes.length)];
+            this.color = "#9b59b6"; // Purple crate
+        } else {
+            this.color = stages[currentStage % 5].obs;
+        }
+    }
+    update() {
+        this.x -= globalSpeed;
+        
+        // Dodge points
+        if (!this.passed && this.x + this.w < player.x && this.type === 'ground') {
+            this.passed = true;
+            addScore(20);
+        }
+    }
+    draw() {
+        ctx.fillStyle = this.color;
+        if(this.type === 'powerup') {
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+            ctx.strokeStyle = "#fff";
+            ctx.strokeRect(this.x, this.y, this.w, this.h);
+        } else if (this.type === 'air') {
+            ctx.beginPath();
+            ctx.arc(this.x + this.w/2, this.y + this.h/2, this.w/2, 0, Math.PI*2);
+            ctx.fill();
+        } else {
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+        }
+    }
+}
+
+class Boss {
+    constructor() {
+        this.w = 80;
+        this.h = 100;
+        this.x = W + 100; // Slide in
+        this.y = GROUND_Y - this.h;
+        this.hp = 3 + (currentStage * 2);
+        this.maxHp = this.hp;
+        this.state = 'entering';
+        this.throwTimer = 0;
+    }
+    update() {
+        if (this.state === 'entering') {
+            this.x -= 2;
+            if (this.x <= W - 150) this.state = 'active';
+        } else if (this.state === 'active') {
+            // Hover up and down
+            this.y = GROUND_Y - this.h + Math.sin(frameCount * 0.05) * 20;
+            
+            this.throwTimer++;
+            let attackRate = Math.max(40, 100 - (currentStage * 10)); // Gets faster
+            
+            if (this.throwTimer > attackRate) {
+                this.throwTimer = 0;
+                this.throwTank();
+            }
+        }
+    }
+    throwTank() {
+        // Stage 1: Fastball, Stage 2: +Bouncer, Stage 3: +Raindrop
+        let r = Math.random();
+        let type = 'fastball';
+        
+        if (currentStage >= 1 && r > 0.4) type = 'bouncer';
+        if (currentStage >= 2 && r > 0.7) type = 'raindrop';
+        if (currentStage >= 4 && r > 0.9) {
+            // Double throw
+            entities.push(new GasTank('fastball', this.x, this.y));
+            setTimeout(() => entities.push(new GasTank('bouncer', this.x, this.y)), 300);
+            return;
+        }
+
+        entities.push(new GasTank(type, this.x, this.y + 20));
+    }
+    draw() {
+        // Boss body
+        ctx.fillStyle = "#2c3e50";
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        // Face
+        ctx.fillStyle = "#ecf0f1";
+        ctx.fillRect(this.x + 10, this.y + 10, 60, 40);
+        // Eyes
+        ctx.fillStyle = "#c0392b";
+        ctx.fillRect(this.x + 20, this.y + 20, 15, 10);
+        ctx.fillRect(this.x + 45, this.y + 20, 15, 10);
+        
+        // Flashing when hurt
+        if (this.hurtFlash > 0) {
+            ctx.fillStyle = "rgba(255,255,255,0.8)";
+            ctx.fillRect(this.x, this.y, this.w, this.h);
+            this.hurtFlash--;
+        }
+    }
+}
+
+class GasTank {
+    constructor(type, x, y) {
+        this.x = x; this.y = y;
+        this.w = 30; this.h = 15;
+        this.type = type; // fastball, bouncer, raindrop
+        
+        if (type === 'fastball') { this.dx = -9 - currentStage; this.dy = 0; this.g = 0; }
+        else if (type === 'bouncer') { this.dx = -6 - currentStage; this.dy = -2; this.g = 0.4; }
+        else if (type === 'raindrop') { this.dx = -3; this.dy = -15; this.g = 0.3; }
+        
+        this.isIce = currentStage >= 2;
+    }
+    update() {
+        this.x += this.dx;
+        this.dy += this.g;
+        this.y += this.dy;
+
+        if (this.y + this.h >= GROUND_Y && this.type === 'bouncer') {
+            this.y = GROUND_Y - this.h;
+            this.dy = -8; // Bounce
+        }
+    }
+    draw() {
+        ctx.fillStyle = this.isIce ? "#7ed6df" : "#7f8c8d";
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = "#c0392b"; // Red tip
+        ctx.fillRect(this.x - 5, this.y + 2, 5, 11);
+    }
+}
+
+class Projectile {
+    constructor(x, y, dx, dy, type) {
+        this.x = x; this.y = y; this.dx = dx; this.dy = dy; this.type = type;
+        this.w = type === 'nail' ? 10 : 20;
+        this.h = type === 'nail' ? 4 : 8;
+        this.active = true;
+    }
+    update() {
+        this.x += this.dx;
+        this.y += this.dy;
+        if(this.x > W || this.y < 0) this.active = false;
+    }
+    draw() {
+        ctx.fillStyle = this.type === 'water' ? "#3498db" : (this.type === 'ice' ? "#00ffff" : "#bdc3c7");
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+    }
+}
+
+class Particle {
+    constructor(x, y, color) {
+        this.x = x; this.y = y;
+        this.dx = (Math.random() - 0.5) * 10;
+        this.dy = (Math.random() - 0.5) * 10;
+        this.life = 1.0;
+        this.color = color;
+        this.size = Math.random() * 6 + 2;
+    }
+    update() {
+        this.x += this.dx; this.y += this.dy;
+        this.life -= 0.05;
+    }
+    draw() {
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.size, this.size);
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x; this.y = y; this.text = text; this.color = color;
+        this.life = 1.0; this.dy = -2;
+    }
+    update() { this.y += this.dy; this.life -= 0.02; }
+    draw() {
+        ctx.globalAlpha = Math.max(0, this.life);
+        ctx.fillStyle = this.color;
+        ctx.font = "12px 'Press Start 2P'";
+        ctx.fillText(this.text, this.x, this.y);
+        ctx.globalAlpha = 1.0;
+    }
+}
+
+// Logic Utils
+function spawnParticles(x, y, color, count=10) {
+    for(let i=0; i<count; i++) particles.push(new Particle(x, y, color));
+}
+function addScore(pts) {
+    score += pts * player.multiplier;
+    ui.score.innerText = Math.floor(score).toString().padStart(6, '0');
+}
+function shake(amt) { screenShake = amt; }
+
+function checkCollision(r1, r2) {
+    // slightly forgiving hitbox
+    let padding = 5;
+    return !(r2.x > r1.x + r1.w - padding || 
+             r2.x + r2.w < r1.x + padding || 
+             r2.y > r1.y + r1.h - padding ||
+             r2.y + r2.h < r1.y + padding);
+}
+
+// Main Game Logic Loop
+function update() {
+    if (gameState === 'MENU' || gameState === 'GAMEOVER') return;
+
+    frameCount++;
+    
+    // Physics & movement
+    player.update();
+    
+    if (gameState === 'PLAYING') {
+        distance += (globalSpeed / 60);
+        ui.dist.innerText = Math.floor(distance) + 'm';
+        addScore(0.1); // Passive score
+
+        // Spawner
+        if (frameCount % 70 === 0) {
+            let r = Math.random();
+            if (r < 0.1) entities.push(new Obstacle('powerup'));
+            else if (r < 0.4) entities.push(new Obstacle('air')); // Fireball
+            else entities.push(new Obstacle('ground'));
+        }
+
+        // Increase speed slightly over time
+        if(frameCount % 600 === 0 && globalSpeed < 15) globalSpeed += 0.5;
+
+        // Boss Trigger
+        if (score >= bossTargetPoints) {
+            gameState = 'BOSS';
+            boss = new Boss();
+            ui.bossHp.classList.remove('hidden');
+            ui.stage.innerText = "WARNING: BOSS!";
+            ui.stage.style.color = "#fff";
+            entities = []; // Clear field
+        }
+    }
+
+    if (gameState === 'BOSS') {
+        boss.update();
+        ui.bossHp.innerText = `BOSS HP: ${boss.hp}`;
+    }
+
+    // Entity Updates
+    for (let i = entities.length - 1; i >= 0; i--) {
+        let e = entities[i];
+        e.update();
+
+        // Projectile collisions with enemies
+        for (let j = projectiles.length - 1; j >= 0; j--) {
+            let p = projectiles[j];
+            if (p.active && checkCollision(p, e)) {
+                if (e.type === 'air') { // Hit fireball
+                    addScore(100);
+                    spawnParticles(e.x, e.y, e.color, 15);
+                    sfxExplosion();
+                    floatingTexts.push(new FloatingText(e.x, e.y, "+100", "#e74c3c"));
+                    entities.splice(i, 1);
+                    p.active = false;
+                    break;
+                } else if (e instanceof GasTank && p.type === 'nail') {
+                    spawnParticles(e.x, e.y, "#fff", 20);
+                    sfxExplosion();
+                    shake(5);
+                    boss.hp--;
+                    boss.hurtFlash = 5;
+                    sfxBossHit();
+                    entities.splice(i, 1);
+                    p.active = false;
+                    
+                    if (boss.hp <= 0) {
+                        defeatBoss();
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (e.x + e.w < 0) {
+            entities.splice(i, 1); // Clean up off screen
+        } else if (checkCollision(player, e)) {
+            if (e.type === 'powerup') {
+                activatePowerup(e.powerType);
+                entities.splice(i, 1);
+                sfxPowerup();
+            } else if (player.p_invinc > 0) {
+                // Destroy obstacle
+                spawnParticles(e.x, e.y, "#fff", 20);
+                sfxExplosion();
+                entities.splice(i, 1);
+                addScore(50);
+            } else {
+                gameOver();
+            }
+        } else if (e instanceof GasTank && e.y + e.h >= GROUND_Y && e.type !== 'bouncer') {
+            // Gas tank hit ground and exploded
+            spawnParticles(e.x, e.y, "#e74c3c", 20);
+            sfxExplosion();
+            shake(10);
+            entities.splice(i, 1);
+            if (e.isIce) {
+                // Ice shrapnel creates a ground obstacle
+                let ice = new Obstacle('ground');
+                ice.x = e.x; ice.color = "#00ffff";
+                entities.push(ice);
+            }
+        }
+    }
+
+    // Projectile cleanup
+    projectiles.forEach(p => p.update());
+    projectiles = projectiles.filter(p => p.active);
+
+    // Particles & Text cleanup
+    particles.forEach(p => p.update());
+    particles = particles.filter(p => p.life > 0);
+    floatingTexts.forEach(t => t.update());
+    floatingTexts = floatingTexts.filter(t => t.life > 0);
+    
+    updatePowerupDisplay();
+}
+
+function activatePowerup(type) {
+    let dur = 600; // 10 seconds at 60fps
+    let msg = "";
+    switch(type) {
+        case 'spread': player.p_spread = dur; msg = "TRIPLE SHOOT!"; break;
+        case 'ice': player.p_ice = dur; msg = "ICE HOSE!"; break;
+        case 'star': player.p_invinc = dur; msg = "INVINCIBLE!"; break;
+        case 'multi': player.p_multi = dur; player.multiplier = 2; msg = "2X SCORE!"; break;
+        case 'jump': player.maxJumps = 2; player.p_multi = dur; msg = "DOUBLE JUMP!"; break;
+    }
+    floatingTexts.push(new FloatingText(player.x, player.y - 20, msg, "#9b59b6"));
+}
+
+function updatePowerupDisplay() {
+    let statuses = [];
+    if(player.p_invinc > 0) statuses.push("STAR");
+    if(player.p_spread > 0) statuses.push("SPREAD");
+    if(player.p_ice > 0) statuses.push("ICE");
+    if(player.p_multi > 0) statuses.push("2X");
+    if(player.maxJumps > 1) statuses.push("D-JUMP");
+    ui.power.innerText = statuses.join(" | ");
+}
+
+function defeatBoss() {
+    gameState = 'TRANSITION';
+    ui.bossHp.classList.add('hidden');
+    spawnParticles(boss.x, boss.y, "#f1c40f", 100);
+    shake(20);
+    sfxExplosion();
+    
+    // Animate Boss flying away
+    let flyY = boss.y;
+    let flyTimer = setInterval(() => {
+        boss.y -= 10;
+        boss.x += 5;
+        draw(); // Force draw during transition
+        if (boss.y < -200) {
+            clearInterval(flyTimer);
+            currentStage++;
+            bossTargetPoints += 1000 + (currentStage * 500); // Next boss harder
+            boss = null;
+            globalSpeed += 1; // Faster next stage
+            ui.stage.innerText = stages[currentStage % 5].name;
+            ui.stage.style.color = stages[currentStage % 5].fire;
+            gameState = 'PLAYING';
+        }
+    }, 16);
+}
+
+function draw() {
+    // Stage colors
+    let stg = stages[currentStage % 5];
+    ctx.fillStyle = stg.bg;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    
+    // Screen shake
+    if (screenShake > 0) {
+        let dx = (Math.random() - 0.5) * screenShake;
+        let dy = (Math.random() - 0.5) * screenShake;
+        ctx.translate(dx, dy);
+        screenShake *= 0.9;
+        if (screenShake < 0.5) screenShake = 0;
+    }
+
+    // Grid / Parallax background (simple lines)
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 2;
+    let offset = (distance * 10) % 100;
+    for(let i = -100; i < W; i+= 100) {
+        ctx.beginPath();
+        let drawX = i;
+        if(gameState === 'PLAYING') drawX -= offset;
+        ctx.moveTo(drawX, 0);
+        ctx.lineTo(drawX, GROUND_Y);
+        ctx.stroke();
+    }
+
+    // Ground
+    ctx.fillStyle = stg.ground;
+    ctx.fillRect(0, GROUND_Y, W, H - GROUND_Y);
+    
+    // Ground detail line
+    ctx.fillStyle = stg.obs;
+    ctx.fillRect(0, GROUND_Y, W, 5);
+
+    if (player) player.draw();
+    if (boss) boss.draw();
+    
+    entities.forEach(e => e.draw());
+    projectiles.forEach(p => p.draw());
+    particles.forEach(p => p.draw());
+    floatingTexts.forEach(t => t.draw());
+
+    ctx.restore();
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+// Game Flow controls
+function startGame() {
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    ui.start.classList.add('hidden');
+    ui.over.classList.add('hidden');
+    ui.hud.classList.remove('hidden');
+    
+    player = new Player();
+    entities = [];
+    projectiles = [];
+    particles = [];
+    floatingTexts = [];
+    score = 0;
+    distance = 0;
+    frameCount = 0;
+    currentStage = 0;
+    globalSpeed = 8;
+    bossTargetPoints = 1000;
+    boss = null;
+    gameState = 'PLAYING';
+    
+    ui.stage.innerText = stages[0].name;
+    ui.stage.style.color = stages[0].fire;
+    
+    startSiren();
+}
+
+function gameOver() {
+    gameState = 'GAMEOVER';
+    stopSiren();
+    shake(15);
+    sfxExplosion();
+    spawnParticles(player.x + player.w/2, player.y + player.h/2, "#e74c3c", 50);
+    
+    if (score > highScore) {
+        highScore = Math.floor(score);
+        localStorage.setItem('ambulanceHighScore', highScore);
+    }
+    
+    ui.hud.classList.add('hidden');
+    ui.over.classList.remove('hidden');
+    document.getElementById('finalScore').innerText = Math.floor(score);
+    ui.hiEnd.innerText = highScore;
+}
+
+// Inputs
+function handleInput(e, isTouch = false) {
+    if(gameState !== 'PLAYING' && gameState !== 'BOSS') return;
+    
+    let x, y;
+    if (isTouch) {
+        // Prevent default zoom/scroll on canvas
+        e.preventDefault(); 
+        x = e.changedTouches[0].clientX;
+        y = e.changedTouches[0].clientY;
+    } else {
+        // Keyboard mapping: Space = Jump, F = Shoot straight, G = Shoot Up
+        if (e.code === 'Space') { player.jump(); return; }
+        if (e.code === 'KeyF') { player.shoot(false); return; }
+        if (e.code === 'KeyG') { player.shoot(true); return; }
+        return; // Ignore other keys
+    }
+
+    if (x < W / 2) {
+        player.jump();
+    } else {
+        if (y < H / 2) player.shoot(true); // Top right = 45 deg
+        else player.shoot(false); // Bottom right = straight
+    }
+}
+
+window.addEventListener('touchstart', (e) => handleInput(e, true), {passive: false});
+window.addEventListener('keydown', (e) => handleInput(e, false));
+
+ui.startBtn.addEventListener('click', startGame);
+ui.restartBtn.addEventListener('click', startGame);
+
+// Prevent context menu on long press
+window.oncontextmenu = function(event) {
+     event.preventDefault();
+     event.stopPropagation();
+     return false;
+};
+
+// Start Render Loop (menu background)
+requestAnimationFrame(gameLoop);
+
+</script>
+</body>
+</html>
+
