@@ -25,7 +25,6 @@
             image-rendering: pixelated; 
         }
 
-        /* Arcade CRT Scanline Effect */
         .crt-overlay {
             background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
             background-size: 100% 3px, 3px 100%;
@@ -76,7 +75,7 @@
         
         .hud-left { display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
         .hud-right { text-align: right; font-size: 12px; color: #f1c40f; pointer-events: none; }
-        #scoreDisplay { font-size: 24px; color: #2ecc71; text-shadow: 3px 3px 0px #27ae60; }
+        #scoreDisplay { font-size: 24px; color: #f1c40f; text-shadow: 3px 3px 0px #d35400; }
         #distDisplay { font-size: 12px; color: #fff; }
         #stageDisplay { font-size: 14px; margin-top: 5px; color: #e74c3c; animation: blink 1s infinite; text-shadow: 2px 2px 0px #c0392b;}
         #powerupDisplay { font-size: 14px; color: #9b59b6; margin-top: 5px; text-shadow: 2px 2px 0px #8e44ad; }
@@ -183,7 +182,7 @@ const ctx = canvas.getContext('2d', { alpha: false });
 let W, H, GROUND_Y, dpr;
 function resize() {
     W = window.innerWidth; H = window.innerHeight;
-    GROUND_Y = H * 0.82; // Dynamic ground
+    GROUND_Y = H * 0.82; 
     dpr = window.devicePixelRatio || 1;
     canvas.width = W * dpr; canvas.height = H * dpr;
     ctx.scale(dpr, dpr);
@@ -212,13 +211,13 @@ let score = 0, distance = 0, frameCount = 0, currentStage = 0;
 let globalSpeed = 6, screenShake = 0, bossTargetPoints = 1000; 
 let renderLoopStarted = false;
 
-// Palettes and background info per stage
+// Stage themes corresponding to the sprite sheets
 const stages = [
-    { name: "STAGE 1: CITY", bg: "#1a1a2e", sky: "#0f3460", mid: "#16213e", ground: "#111", line: "#f1c40f", obs: "#7f8c8d", fire: "#e67e22", roof: "#3498db" },
-    { name: "STAGE 2: DESERT", bg: "#d35400", sky: "#e67e22", mid: "#a04000", ground: "#873600", line: "#f39c12", obs: "#6e2c00", fire: "#f1c40f", roof: "#e74c3c" },
-    { name: "STAGE 3: TUNDRA", bg: "#1e3799", sky: "#4a69bd", mid: "#0c2461", ground: "#0a3d62", line: "#82ccdd", obs: "#dff9fb", fire: "#7ed6df", roof: "#ecf0f1" },
-    { name: "STAGE 4: CYBER", bg: "#2c003e", sky: "#510a32", mid: "#190028", ground: "#000", line: "#ff007f", obs: "#00ffcc", fire: "#ff007f", roof: "#f368e0" },
-    { name: "STAGE 5: VOLCANO", bg: "#2d0000", sky: "#4a0000", mid: "#1a0000", ground: "#000", line: "#c0392b", obs: "#333", fire: "#ff3f34", roof: "#ffb142" }
+    { name: "STAGE 1: CITY", bg: "#1a1a2e", sky: "#0f3460", mid: "#16213e", ground: "#222", line: "#f1c40f" },
+    { name: "STAGE 2: DESERT", bg: "#d35400", sky: "#e67e22", mid: "#a04000", ground: "#c2b280", line: "#f39c12" },
+    { name: "STAGE 3: TUNDRA", bg: "#1e3799", sky: "#4a69bd", mid: "#0c2461", ground: "#ecf0f1", line: "#82ccdd" },
+    { name: "STAGE 4: CYBER", bg: "#2c003e", sky: "#510a32", mid: "#190028", ground: "#000", line: "#ff007f" },
+    { name: "STAGE 5: VOLCANO", bg: "#2d0000", sky: "#4a0000", mid: "#1a0000", ground: "#111", line: "#c0392b" }
 ];
 
 let player, entities = [], particles = [], projectiles = [], floatingTexts = [], boss = null;
@@ -235,8 +234,8 @@ function drawGlow(x, y, radius, color) {
 /** * CLASSES */
 class Player {
     constructor() {
-        this.w = 90; this.h = 45;
-        this.x = 100; this.y = GROUND_Y - this.h;
+        this.w = 110; this.h = 55;
+        this.x = 80; this.y = GROUND_Y - this.h;
         this.dy = 0; this.gravity = 0.65; this.jumpPower = -12.5;
         this.jumps = 0; this.maxJumps = 1; this.lightTimer = 0;
         this.wheelAngle = 0; this.recoil = 0;
@@ -247,7 +246,7 @@ class Player {
     jump() {
         if (this.jumps < this.maxJumps) {
             this.dy = this.jumpPower; this.jumps++; sfxJump();
-            spawnParticles(this.x + 20, GROUND_Y, "#fff", 5);
+            spawnParticles(this.x + 30, GROUND_Y, "#fff", 8);
         }
     }
     shoot(angleUp = false) {
@@ -255,12 +254,12 @@ class Player {
         let yOffset = gameState === 'BOSS' ? -25 : -20;
         let vy = angleUp ? -6 : 0, vx = 14;
         
-        projectiles.push(new Projectile(this.x + 60, this.y + yOffset, vx, vy, type));
+        projectiles.push(new Projectile(this.x + 70, this.y + yOffset, vx, vy, type));
         if (this.p_spread > 0) {
-            projectiles.push(new Projectile(this.x + 60, this.y + yOffset - 8, vx, vy - 2, type));
-            projectiles.push(new Projectile(this.x + 60, this.y + yOffset + 8, vx, vy + 2, type));
+            projectiles.push(new Projectile(this.x + 70, this.y + yOffset - 8, vx, vy - 3, type));
+            projectiles.push(new Projectile(this.x + 70, this.y + yOffset + 8, vx, vy + 3, type));
         }
-        this.recoil = 10;
+        this.recoil = 8;
         if(gameState === 'BOSS') sfxNail(); else sfxShoot();
     }
     update() {
@@ -271,7 +270,7 @@ class Player {
         this.lightTimer++;
         if (this.recoil > 0) this.recoil--;
 
-        if (frameCount % 3 === 0 && this.y + this.h >= GROUND_Y) {
+        if (frameCount % 4 === 0 && this.y + this.h >= GROUND_Y) {
             particles.push(new Particle(this.x - 5, this.y + this.h - 5, "#7f8c8d", "smoke"));
         }
 
@@ -285,89 +284,156 @@ class Player {
         
         let bx = this.x, by = this.y;
         
-        // --- AMBULANCE BODY ---
-        drawRect(bx, by, 80, this.h - 10, "#ecf0f1");
-        ctx.fillStyle = "#ecf0f1";
-        ctx.beginPath(); ctx.moveTo(bx + 80, by + 15); ctx.lineTo(bx + 100, by + 25); ctx.lineTo(bx + 100, by + this.h - 10); ctx.lineTo(bx + 80, by + this.h - 10); ctx.fill();
-        drawRect(bx + 95, by + 26, 6, 8, "#7f8c8d");
-        drawRect(bx - 5, by + this.h - 12, 110, 6, "#95a5a6");
+        // --- AMBULANCE AURUM (Accurate to Sprite) ---
+        // Main Box
+        drawRect(bx, by, 85, this.h - 12, "#ecf0f1"); // White body
+        drawRect(bx, by, 85, 2, "#bdc3c7"); // Top shading
         
-        drawRect(bx, by + 20, 85, 8, "#e74c3c"); // Stripe
+        // Front Cab / Hood
+        ctx.fillStyle = "#ecf0f1";
+        ctx.beginPath(); 
+        ctx.moveTo(bx + 85, by + 12); 
+        ctx.lineTo(bx + 105, by + 26); 
+        ctx.lineTo(bx + 110, by + 30); 
+        ctx.lineTo(bx + 110, by + this.h - 12); 
+        ctx.lineTo(bx + 85, by + this.h - 12); 
+        ctx.fill();
+        
+        // Grill & Bumper
+        drawRect(bx + 106, by + 32, 5, 10, "#7f8c8d"); // Grill
+        drawRect(bx - 2, by + this.h - 14, 114, 8, "#7f8c8d"); // Gray Bumper
+        drawRect(bx - 2, by + this.h - 14, 114, 2, "#95a5a6"); // Bumper highlight
+        
+        // The Orange Stripe
+        drawRect(bx, by + 22, 110, 8, "#e67e22"); 
+        
+        // Blue Star of Life
+        drawRect(bx + 18, by + 10, 8, 20, "#2980b9"); // Vertical
+        drawRect(bx + 12, by + 16, 20, 8, "#2980b9"); // Horizontal
+        drawRect(bx + 14, by + 12, 16, 16, "#2980b9"); // Diagonals block
+        drawRect(bx + 20, by + 12, 4, 16, "#ecf0f1"); // Inner snake/staff mock
         
         // Windows
-        drawRect(bx + 60, by + 5, 20, 12, "#2c3e50"); 
-        ctx.beginPath(); ctx.moveTo(bx + 80, by + 5); ctx.lineTo(bx + 92, by + 15); ctx.lineTo(bx + 80, by + 15); ctx.fillStyle = "#2c3e50"; ctx.fill(); 
-        drawRect(bx + 65, by + 5, 5, 12, "rgba(255,255,255,0.2)");
+        drawRect(bx + 62, by + 6, 20, 14, "#2c3e50"); // Side window
+        ctx.beginPath(); ctx.moveTo(bx + 85, by + 6); ctx.lineTo(bx + 100, by + 18); ctx.lineTo(bx + 85, by + 18); ctx.fillStyle = "#2c3e50"; ctx.fill(); // Windshield
+        drawRect(bx + 66, by + 6, 4, 14, "rgba(255,255,255,0.2)"); // Reflection
         
-        // Red Cross
-        drawRect(bx + 25, by + 10, 20, 8, "#e74c3c");
-        drawRect(bx + 31, by + 4, 8, 20, "#e74c3c");
-
-        // Headlight Beam
+        // Headlight 
         if (gameState !== 'GAMEOVER') {
-            ctx.fillStyle = "rgba(241, 196, 15, 0.15)";
-            ctx.beginPath(); ctx.moveTo(bx + 100, by + 28); ctx.lineTo(bx + 300, by - 20); ctx.lineTo(bx + 300, by + 60); ctx.fill();
-            drawRect(bx + 98, by + 26, 3, 5, "#f1c40f"); 
+            ctx.fillStyle = "rgba(241, 196, 15, 0.2)";
+            ctx.beginPath(); ctx.moveTo(bx + 110, by + 32); ctx.lineTo(bx + 350, by - 30); ctx.lineTo(bx + 350, by + 80); ctx.fill();
+            drawRect(bx + 108, by + 30, 3, 6, "#f1c40f"); 
         }
 
-        // Siren Light
-        let sirenColor = Math.floor(this.lightTimer / 8) % 2 === 0 ? "rgba(255,0,0,0.8)" : "rgba(0,100,255,0.8)";
-        drawRect(bx + 15, by - 8, 15, 8, "#111");
-        drawRect(bx + 17, by - 6, 11, 6, sirenColor);
-        drawGlow(bx + 22, by - 3, 30, sirenColor.replace('0.8', '0.4'));
-
-        // --- ABDUL ROOF ---
-        let ax = bx + 45, ay = by - 15;
-        drawRect(ax, ay, 15, 15, stages[currentStage % 5].roof);
-        drawRect(ax + 2, ay - 12, 11, 12, "#f1c40f");
-        drawRect(ax + 6, ay - 9, 8, 4, "#000"); // Shades
+        // Siren Lights
+        let sirenRed = Math.floor(this.lightTimer / 8) % 2 === 0;
+        drawRect(bx + 60, by - 8, 12, 8, "#111"); // Base
+        drawRect(bx + 62, by - 6, 8, 6, sirenRed ? "#e74c3c" : "#bdc3c7");
+        drawRect(bx + 75, by - 8, 12, 8, "#111"); // Base
+        drawRect(bx + 77, by - 6, 8, 6, !sirenRed ? "#3498db" : "#bdc3c7");
         
-        // Weapon & Arm 
-        let armX = ax + 5 - this.recoil;
-        drawRect(armX, ay + 4, 15, 4, "#e67e22"); 
-        if (gameState === 'BOSS') {
-            drawRect(armX + 10, ay + 2, 12, 6, "#7f8c8d"); // Nailgun
-            drawRect(armX + 18, ay + 6, 4, 6, "#333");
-        } else {
-            drawRect(armX + 10, ay + 2, 15, 5, "#3498db"); // Hose
-            drawRect(armX + 22, ay + 1, 4, 7, "#bdc3c7");
+        if(sirenRed) drawGlow(bx + 66, by - 3, 30, "rgba(231, 76, 60, 0.5)");
+        else drawGlow(bx + 81, by - 3, 30, "rgba(52, 152, 219, 0.5)");
+
+        // --- ABDUL ROOF (Dynamic Outfits) ---
+        let ax = bx + 35, ay = by - 20;
+        let skin = "#a66a38";
+        
+        // Offset for recoil
+        let armX = ax + 10 - this.recoil;
+
+        // Stage 5: Hazmat Suit
+        if (currentStage % 5 === 4) {
+            drawRect(ax, ay-12, 18, 32, "#f1c40f"); // Yellow Suit
+            drawRect(ax-2, ay, 8, 15, "#f1c40f"); // Back tank
+            drawRect(ax+4, ay-8, 12, 10, "#111"); // Mask base
+            drawRect(ax+12, ay-6, 4, 4, "#555"); // Goggle
+            drawRect(ax+10, ay-2, 6, 6, "#333"); // Filter
+            
+            // Nail Gun (Yellow/Gray)
+            drawRect(armX, ay + 6, 12, 6, "#f1c40f"); // Arm
+            drawRect(armX + 12, ay + 4, 14, 8, "#f1c40f"); // Gun Body
+            drawRect(armX + 26, ay + 6, 10, 4, "#bdc3c7"); // Barrel
+            drawRect(armX + 16, ay + 12, 4, 8, "#333"); // Mag
+        } 
+        // Stage 3: Tundra Parka
+        else if (currentStage % 5 === 2) {
+            drawRect(ax-2, ay-14, 22, 16, "#bdc3c7"); // Fur hood
+            drawRect(ax, ay, 20, 20, "#34495e"); // Heavy Parka
+            drawRect(ax+4, ay-10, 10, 12, skin); // Face
+            drawRect(ax+6, ay-8, 6, 3, "#111"); // Mustache/Hair
+            
+            this.drawStandardWeapon(armX, ay);
+        }
+        // Stages 1, 2, 4
+        else {
+            drawRect(ax, ay, 18, 20, "#2ecc71"); // High-Vis Vest
+            drawRect(ax, ay, 18, 4, "#2980b9"); // Blue shirt under
+            drawRect(ax+4, ay-12, 12, 12, skin); // Face
+            drawRect(ax+4, ay-14, 12, 4, "#111"); // Hair
+            drawRect(ax+8, ay-6, 8, 2, "#111"); // Mustache
+
+            if (currentStage % 5 === 1) { // Desert: Aviators & Scarf
+                drawRect(ax+8, ay-10, 8, 4, "#111"); // Shades
+                // Scarf
+                drawRect(ax-8, ay-2, 12, 4, "#d35400");
+                if(frameCount % 10 < 5) drawRect(ax-14, ay, 8, 4, "#d35400");
+                else drawRect(ax-14, ay-4, 8, 4, "#d35400");
+            }
+            if (currentStage % 5 === 3) { // Cyber: Eyepatch
+                drawRect(ax+8, ay-10, 4, 4, "#000"); // Patch
+                drawRect(ax+4, ay-9, 4, 2, "#000"); // Strap
+            }
+            
+            this.drawStandardWeapon(armX, ay);
         }
 
-        // Scarf
-        let wave = Math.sin(frameCount * 0.3) * 5;
-        for(let i=0; i<4; i++) { drawRect(ax - (i*5) - 5, ay + 2 + Math.sin(frameCount*0.2 + i)*3, 6, 4, "#c0392b"); }
-
-        this.drawWheel(bx + 15, by + this.h - 10);
-        this.drawWheel(bx + 75, by + this.h - 10);
+        // --- WHEELS ---
+        this.drawWheel(bx + 20, by + this.h - 10);
+        this.drawWheel(bx + 85, by + this.h - 10);
     }
     
+    drawStandardWeapon(armX, ay) {
+        if (gameState === 'BOSS') {
+            // Nail Gun (Yellow & Gray)
+            drawRect(armX, ay + 6, 12, 6, "#2980b9"); // Sleeve
+            drawRect(armX + 12, ay + 4, 14, 8, "#f1c40f"); // Gun Body
+            drawRect(armX + 26, ay + 6, 10, 4, "#bdc3c7"); // Barrel
+            drawRect(armX + 16, ay + 12, 4, 8, "#333"); // Mag
+        } else {
+            // Water Cannon (Gray)
+            drawRect(armX, ay + 6, 12, 6, "#2980b9"); // Sleeve
+            drawRect(armX + 12, ay + 4, 18, 8, "#95a5a6"); // Cannon Body
+            drawRect(armX + 30, ay + 5, 6, 6, "#7f8c8d"); // Nozzle
+        }
+    }
+
     drawWheel(wx, wy) {
         ctx.save(); ctx.translate(wx, wy); ctx.rotate(this.wheelAngle);
-        ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fillStyle = "#111"; ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fillStyle = "#bdc3c7"; ctx.fill();
-        ctx.fillStyle = "#7f8c8d"; ctx.fillRect(-6, -1, 12, 2); ctx.fillRect(-1, -6, 2, 12);
+        ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI*2); ctx.fillStyle = "#111"; ctx.fill(); // Tire
+        ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI*2); ctx.fillStyle = "#bdc3c7"; ctx.fill(); // Rim
+        ctx.fillStyle = "#7f8c8d"; ctx.fillRect(-7, -1, 14, 2); ctx.fillRect(-1, -7, 2, 14); // Spokes
         ctx.restore();
     }
 }
 
 class Obstacle {
     constructor(type) {
-        this.x = W; this.w = 30; this.h = 40; this.type = type; this.passed = false;
-        this.y = GROUND_Y - this.h;
+        this.x = W; this.type = type; this.passed = false;
         this.anim = Math.random() * 100;
         
         if (type === 'air') {
-            this.y = GROUND_Y - 70 - Math.random() * 50;
-            this.w = 24; this.h = 24;
-            this.color = stages[currentStage % 5].fire;
+            this.y = GROUND_Y - 80 - Math.random() * 60;
+            this.w = 30; this.h = 30;
         } else if (type === 'powerup') {
-            this.y = GROUND_Y - 50 - Math.random() * 60;
+            this.y = GROUND_Y - 60 - Math.random() * 70;
             this.w = 26; this.h = 26;
             const pTypes = ['spread', 'ice', 'jump', 'star', 'multi'];
             this.powerType = pTypes[Math.floor(Math.random() * pTypes.length)];
             this.color = "#9b59b6";
         } else {
-            this.color = stages[currentStage % 5].obs;
+            this.w = 40; this.h = 40;
+            this.y = GROUND_Y - this.h;
         }
     }
     update() {
@@ -377,30 +443,78 @@ class Obstacle {
     }
     draw() {
         let x = this.x, y = this.y;
+        let stg = currentStage % 5;
+        
         if(this.type === 'powerup') {
             y += Math.sin(this.anim) * 5;
             drawRect(x, y, this.w, this.h, this.color);
             drawRect(x+4, y+4, this.w-8, this.h-8, "#8e44ad");
             drawRect(x+10, y+10, 6, 6, "#fff"); 
             drawGlow(x+this.w/2, y+this.h/2, 30, "rgba(155, 89, 182, 0.4)");
-        } else if (this.type === 'air') {
-            drawGlow(x+this.w/2, y+this.h/2, 25, this.color === '#ff007f' ? 'rgba(255,0,127,0.5)' : 'rgba(230, 126, 34, 0.5)');
-            drawRect(x, y + Math.sin(this.anim)*2, this.w, this.h, this.color);
-            drawRect(x - 5, y + 5 + Math.sin(this.anim)*2, 5, 14, "#c0392b"); 
-            drawRect(x + 5, y + 5 + Math.sin(this.anim)*2, 14, 14, "#fff"); 
-        } else {
-            drawRect(x, y, this.w, this.h, this.color);
-            drawRect(x, y, this.w, 5, "rgba(255,255,255,0.3)"); 
-            drawRect(x + this.w - 5, y, 5, this.h, "rgba(0,0,0,0.3)"); 
-            drawRect(x, y + 10, this.w, 8, "#e67e22");
-            drawRect(x, y + 25, this.w, 8, "#e67e22");
+        } 
+        else if (this.type === 'air') {
+            let cx = x + this.w/2, cy = y + this.h/2;
+            if (stg === 0) { // Orange Flame
+                drawGlow(cx, cy, 30, "rgba(230, 126, 34, 0.6)");
+                drawRect(x+5, y+5+Math.sin(this.anim)*3, 20, 20, "#e67e22");
+                drawRect(x+10, y+10+Math.sin(this.anim)*3, 10, 10, "#f1c40f");
+            } else if (stg === 1) { // Solar Flare
+                drawGlow(cx, cy, 35, "rgba(241, 196, 15, 0.6)");
+                ctx.beginPath(); ctx.arc(cx, cy, 12 + Math.sin(this.anim*2)*2, 0, Math.PI*2); ctx.fillStyle="#f1c40f"; ctx.fill();
+                ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI*2); ctx.fillStyle="#fff"; ctx.fill();
+            } else if (stg === 2) { // Frost Fire
+                drawGlow(cx, cy, 30, "rgba(52, 152, 219, 0.6)");
+                ctx.save(); ctx.translate(cx, cy); ctx.rotate(this.anim);
+                drawRect(-12, -4, 24, 8, "#3498db"); drawRect(-4, -12, 8, 24, "#7ed6df");
+                ctx.restore();
+            } else if (stg === 3) { // Pink Plasma
+                drawGlow(cx, cy, 35, "rgba(255, 0, 127, 0.6)");
+                ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI*2); ctx.fillStyle="#ff007f"; ctx.fill();
+                ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI*2); ctx.fillStyle="#ffb8e0"; ctx.fill();
+            } else { // Magma Boulder
+                drawGlow(cx, cy, 30, "rgba(192, 57, 43, 0.6)");
+                ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI*2); ctx.fillStyle="#8e44ad"; ctx.fill(); // dark base
+                drawRect(x+6, y+8, 18, 14, "#c0392b");
+                drawRect(x+12, y+12, 6, 6, "#f1c40f");
+            }
+        } 
+        else { // Ground Hazards
+            if (stg === 0) { // Concrete Barrier
+                drawRect(x, y, this.w, this.h, "#95a5a6");
+                drawRect(x, y, this.w, 5, "#bdc3c7");
+                // Orange diagonal stripes (approximated)
+                drawRect(x+5, y+10, 10, 20, "#e67e22");
+                drawRect(x+25, y+10, 10, 20, "#e67e22");
+            } else if (stg === 1) { // Tumbleweed
+                ctx.save(); ctx.translate(x+this.w/2, y+this.h/2); ctx.rotate(this.anim);
+                ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fillStyle="#a0522d"; ctx.fill();
+                drawRect(-15, -2, 30, 4, "#cd853f"); drawRect(-2, -15, 4, 30, "#cd853f");
+                drawRect(-10, -10, 20, 20, "#8b4513");
+                ctx.restore();
+            } else if (stg === 2) { // Ice Block
+                drawRect(x, y, this.w, this.h, "#7ed6df");
+                drawRect(x+4, y+4, this.w-8, this.h-8, "#3498db");
+                // Spikes
+                ctx.fillStyle = "#fff";
+                ctx.beginPath(); ctx.moveTo(x+5, y); ctx.lineTo(x+10, y-10); ctx.lineTo(x+15, y); ctx.fill();
+                ctx.beginPath(); ctx.moveTo(x+25, y); ctx.lineTo(x+30, y-12); ctx.lineTo(x+35, y); ctx.fill();
+            } else if (stg === 3) { // Neon Barrier
+                drawRect(x, y, 6, this.h, "#2c3e50"); drawRect(x+this.w-6, y, 6, this.h, "#2c3e50");
+                drawRect(x, y+10, this.w, 6, "#ff007f"); drawGlow(x+this.w/2, y+13, 15, "rgba(255,0,127,0.5)");
+                drawRect(x, y+25, this.w, 6, "#00ffcc"); drawGlow(x+this.w/2, y+28, 15, "rgba(0,255,204,0.5)");
+            } else { // Obsidian
+                ctx.fillStyle = "#111";
+                ctx.beginPath(); ctx.moveTo(x, y+this.h); ctx.lineTo(x+15, y); ctx.lineTo(x+25, y+10); ctx.lineTo(x+this.w, y+this.h); ctx.fill();
+                ctx.fillStyle = "#333";
+                ctx.beginPath(); ctx.moveTo(x+15, y); ctx.lineTo(x+20, y+20); ctx.lineTo(x+10, y+this.h); ctx.fill();
+            }
         }
     }
 }
 
 class Boss {
     constructor() {
-        this.w = 90; this.h = 110; this.x = W + 100;
+        this.w = 90; this.h = 120; this.x = W + 100;
         this.y = GROUND_Y - this.h - 20;
         this.hp = 3 + (currentStage * 2); this.maxHp = this.hp;
         this.state = 'entering'; this.throwTimer = 0; this.hurtFlash = 0;
@@ -428,70 +542,55 @@ class Boss {
     }
     draw() {
         let bx = this.x, by = this.y;
-        let skin = "#e0ac69";
         
-        // --- Hover Platform ---
-        drawRect(bx - 10, by + 95, 110, 15, "#34495e");
-        drawRect(bx - 10, by + 100, 110, 5, "#f1c40f"); // Yellow warning stripe
+        // --- Hover Platform (Since he's human, he needs to fly) ---
+        drawRect(bx - 10, by + 105, 110, 15, "#34495e");
+        drawRect(bx - 10, by + 110, 110, 5, "#f1c40f"); 
         let flameH = 15 + Math.random() * 15;
-        drawRect(bx + 10, by + 110, 15, flameH, "#e67e22");
-        drawRect(bx + 65, by + 110, 15, flameH, "#e67e22");
+        drawRect(bx + 10, by + 120, 15, flameH, "#e67e22");
+        drawRect(bx + 65, by + 120, 15, flameH, "#e67e22");
 
-        // --- Tank Backpack ---
-        drawRect(bx + 55, by + 20, 40, 55, "#c0392b");
-        drawRect(bx + 60, by + 15, 30, 5, "#7f8c8d"); // Cap
-        drawRect(bx + 50, by + 30, 10, 30, "#333"); // Straps
-
-        // --- Legs ---
-        drawRect(bx + 25, by + 70, 40, 25, "#2c3e50"); // Jeans
-        drawRect(bx + 25, by + 90, 15, 5, "#111"); // Shoe L
-        drawRect(bx + 50, by + 90, 15, 5, "#111"); // Shoe R
-
-        // --- Torso ---
-        drawRect(bx + 25, by + 35, 40, 35, "#27ae60"); // Rugged Green Vest
+        // --- GASTANK MOHAMMED (Accurate to Concept) ---
         
-        // --- Head ---
-        drawRect(bx + 30, by + 5, 28, 30, skin);
+        // Background Arm (Holding Tank)
+        drawRect(bx + 55, by + 40, 15, 20, "#95a5a6"); // Gray sleeve
+        drawRect(bx + 60, by + 60, 12, 10, "#8b4513"); // Brown Glove
         
-        // Red Bandana
-        drawRect(bx + 28, by + 5, 32, 8, "#e74c3c");
-        // Bandana tail waving in the wind
-        let tailY = by + 8 + Math.sin(frameCount * 0.2) * 3;
-        drawRect(bx + 55, tailY, 15, 6, "#e74c3c"); 
+        // Tank Backpack / Held Tank
+        drawRect(bx + 60, by + 30, 35, 50, "#c0392b"); // Red tank
+        drawRect(bx + 70, by + 25, 15, 5, "#7f8c8d"); // Cap
 
-        // Thick Black Beard & Hair
-        drawRect(bx + 25, by + 22, 12, 18, "#111"); // Front beard
-        drawRect(bx + 30, by + 30, 25, 10, "#111"); // Bottom beard
-        drawRect(bx + 50, by + 13, 10, 17, "#111"); // Back hair
+        // Legs
+        drawRect(bx + 25, by + 75, 18, 30, "#2c3e50"); // Blue Jeans L
+        drawRect(bx + 45, by + 75, 18, 30, "#2c3e50"); // Blue Jeans R
+        drawRect(bx + 22, by + 100, 20, 10, "#111"); // Boot L
+        drawRect(bx + 45, by + 100, 20, 10, "#111"); // Boot R
 
-        // Angry Eye (Facing Left towards Ambulance)
-        let eyeY = by + 15 + Math.sin(frameCount * 0.1) * 1;
-        drawRect(bx + 28, eyeY, 8, 6, "#fff");
-        drawRect(bx + 28, eyeY + 1, 4, 4, "#000"); // Pupil
-        // Eyebrow angled down angrily
-        ctx.fillStyle = "#111";
-        ctx.beginPath(); ctx.moveTo(bx + 26, eyeY - 2); ctx.lineTo(bx + 38, eyeY + 3); ctx.lineTo(bx + 38, eyeY - 2); ctx.fill();
+        // Torso & Apron
+        drawRect(bx + 20, by + 35, 40, 45, "#8b4513"); // Brown Leather Apron
+        drawRect(bx + 25, by + 35, 30, 15, "#95a5a6"); // Gray shirt showing top
 
-        // --- Arms ---
-        // Back arm holding backpack
-        drawRect(bx + 45, by + 40, 12, 25, skin);
-        
-        // Front arm wind-up logic based on throw timer
+        // Head & Welding Mask
+        drawRect(bx + 25, by + 5, 30, 32, "#34495e"); // Dark mask base
+        drawRect(bx + 25, by + 5, 10, 32, "#2c3e50"); // Mask shading
+        drawRect(bx + 35, by + 12, 18, 12, "#111"); // Black Visor
+
+        // Throwing Arm Logic
         let attackRate = Math.max(35, 90 - (currentStage * 10));
         let throwPhase = this.throwTimer / attackRate;
         
         if (throwPhase > 0.8) {
-            // Winding up to throw (arm pulled back/up)
-            drawRect(bx + 30, by + 25, 12, 25, skin); 
-            drawRect(bx + 15, by + 25, 20, 12, skin); 
+            // Winding up to throw
+            drawRect(bx + 10, by + 35, 25, 15, "#95a5a6"); // Sleeve up
+            drawRect(bx - 5, by + 40, 15, 12, "#8b4513"); // Glove pulled back
         } else {
-            // Arm resting / preparing
-            drawRect(bx + 15, by + 45, 25, 12, skin);
+            // Resting / Idle
+            drawRect(bx + 15, by + 40, 15, 25, "#95a5a6"); // Sleeve down
+            drawRect(bx + 15, by + 60, 15, 15, "#8b4513"); // Glove resting
         }
 
-        // Damage flash
         if (this.hurtFlash > 0) {
-            drawRect(bx - 15, by, this.w + 30, this.h + 25, "rgba(255, 255, 255, 0.8)");
+            drawRect(bx - 10, by, this.w + 20, this.h + 20, "rgba(255, 255, 255, 0.8)");
             this.hurtFlash--;
         }
     }
@@ -499,7 +598,7 @@ class Boss {
 
 class GasTank {
     constructor(type, x, y) {
-        this.x = x; this.y = y; this.w = 34; this.h = 16; this.type = type;
+        this.x = x; this.y = y; this.w = 36; this.h = 18; this.type = type;
         this.rot = 0;
         if (type === 'fastball') { this.dx = -10 - currentStage; this.dy = 0; this.g = 0; }
         else if (type === 'bouncer') { this.dx = -7 - currentStage; this.dy = -3; this.g = 0.5; }
@@ -510,18 +609,18 @@ class GasTank {
         this.x += this.dx; this.dy += this.g; this.y += this.dy;
         this.rot -= 0.1;
         if (this.y + this.h >= GROUND_Y && this.type === 'bouncer') {
-            this.y = GROUND_Y - this.h; this.dy = -9;
+            this.y = GROUND_Y - this.h; this.dy = -10;
         }
     }
     draw() {
         ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2); 
         if(this.type === 'raindrop') ctx.rotate(this.rot);
         
-        let c = this.isIce ? "#7ed6df" : "#7f8c8d";
+        let c = this.isIce ? "#7ed6df" : "#c0392b"; // Red body
         drawRect(-this.w/2, -this.h/2, this.w, this.h, c);
-        drawRect(-this.w/2 + 5, -this.h/2, 5, this.h, "rgba(255,255,255,0.3)");
-        drawRect(-this.w/2 - 6, -this.h/2 + 2, 6, 12, "#c0392b"); // Nozzle
-        drawRect(-this.w/2 + 15, -this.h/2 + 4, 10, 8, "#f1c40f"); // Warning label
+        drawRect(-this.w/2 + 5, -this.h/2, 5, this.h, "rgba(255,255,255,0.4)"); // White shine
+        drawRect(-this.w/2 - 6, -this.h/2 + 3, 6, 12, "#7f8c8d"); // Gray Nozzle
+        drawRect(-this.w/2 + 15, -this.h/2 + 4, 12, 10, "#f1c40f"); // Warning label
         
         ctx.restore();
     }
@@ -530,13 +629,18 @@ class GasTank {
 class Projectile {
     constructor(x, y, dx, dy, type) {
         this.x = x; this.y = y; this.dx = dx; this.dy = dy; this.type = type;
-        this.w = type === 'nail' ? 12 : 24; this.h = type === 'nail' ? 4 : 8; this.active = true;
+        this.w = type === 'nail' ? 14 : 24; this.h = type === 'nail' ? 4 : 8; this.active = true;
     }
     update() { this.x += this.dx; this.y += this.dy; if(this.x > W || this.y < 0) this.active = false; }
     draw() {
-        let c = this.type === 'water' ? "#3498db" : (this.type === 'ice' ? "#00ffff" : "#bdc3c7");
-        drawRect(this.x, this.y, this.w, this.h, c);
-        if(this.type === 'water') drawRect(this.x, this.y + 2, this.w, 4, "#85c1e9"); // highlight
+        if(this.type === 'nail') {
+            drawRect(this.x, this.y, this.w, this.h, "#bdc3c7"); // Silver nail
+            drawRect(this.x + this.w - 4, this.y - 2, 4, 8, "#7f8c8d"); // Nail head
+        } else {
+            let c = this.type === 'water' ? "#3498db" : "#00ffff";
+            drawRect(this.x, this.y, this.w, this.h, c);
+            if(this.type === 'water') drawRect(this.x, this.y + 2, this.w, 4, "#85c1e9");
+        }
     }
 }
 
@@ -546,10 +650,10 @@ class Particle {
         this.life = 1.0;
         if (type === "smoke") {
             this.dx = -2 - Math.random()*2; this.dy = -0.5 - Math.random();
-            this.size = 4 + Math.random()*6; this.decay = 0.02;
+            this.size = 6 + Math.random()*8; this.decay = 0.02;
         } else {
-            this.dx = (Math.random() - 0.5) * 12; this.dy = (Math.random() - 0.5) * 12;
-            this.size = 3 + Math.random()*4; this.decay = 0.04 + Math.random()*0.03;
+            this.dx = (Math.random() - 0.5) * 14; this.dy = (Math.random() - 0.5) * 14;
+            this.size = 4 + Math.random()*5; this.decay = 0.04 + Math.random()*0.03;
         }
     }
     update() { 
@@ -570,8 +674,8 @@ class FloatingText {
     update() { this.y += this.dy; this.life -= 0.02; }
     draw() {
         ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color;
-        ctx.font = "14px 'Press Start 2P'"; 
-        ctx.shadowColor = "#000"; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
+        ctx.font = "16px 'Press Start 2P'"; 
+        ctx.shadowColor = "#000"; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 3;
         ctx.fillText(this.text, this.x, this.y); 
         ctx.shadowColor = "transparent"; ctx.globalAlpha = 1.0;
     }
@@ -581,10 +685,8 @@ class FloatingText {
 class ParallaxBackground {
     draw() {
         let stg = stages[currentStage % 5];
-        
         ctx.fillStyle = stg.bg; ctx.fillRect(0, 0, W, H);
         
-        // Skyline 
         let skyOffset = (distance * 0.5) % 200;
         ctx.fillStyle = stg.sky;
         for(let i = -200; i < W + 200; i += 200) {
@@ -594,7 +696,6 @@ class ParallaxBackground {
             drawRect(x + 160, GROUND_Y - 120, 40, 120, stg.sky);
         }
 
-        // Midground
         let midOffset = (distance * 2) % 150;
         ctx.fillStyle = stg.mid;
         for(let i = -150; i < W + 150; i += 150) {
@@ -603,22 +704,19 @@ class ParallaxBackground {
             drawRect(x + 60, GROUND_Y - 80, 50, 80, stg.mid);
         }
 
-        // Ground base
         drawRect(0, GROUND_Y, W, H - GROUND_Y, stg.ground);
         
-        // Fast moving road lines
         let lineOffset = (distance * 6) % 100;
         ctx.fillStyle = stg.line;
         for(let i = -100; i < W; i+= 100) {
             drawRect(i - lineOffset, GROUND_Y + 30, 50, 8, stg.line);
         }
         
-        drawRect(0, GROUND_Y, W, 8, stg.obs);
+        drawRect(0, GROUND_Y, W, 8, "#555");
     }
 }
 const bg = new ParallaxBackground();
 
-// Utils
 function spawnParticles(x, y, color, count=10, type="spark") { for(let i=0; i<count; i++) particles.push(new Particle(x, y, color, type)); }
 function addScore(pts) { score += pts * player.multiplier; ui.score.innerText = Math.floor(score).toString().padStart(6, '0'); }
 function shake(amt) { screenShake = amt; }
@@ -674,7 +772,10 @@ function update() {
             else if (player.p_invinc > 0) { spawnParticles(e.x+15, e.y+15, "#fff", 20); sfxExplosion(); shake(4); entities.splice(i, 1); addScore(50); }
             else gameOver();
         } else if (e instanceof GasTank && e.y + e.h >= GROUND_Y && e.type !== 'bouncer') {
-            spawnParticles(e.x+15, e.y+15, "#e74c3c", 25); spawnParticles(e.x+15, e.y, "#7f8c8d", 10, "smoke");
+            // Explosions matching concept art (Orange/Yellow)
+            spawnParticles(e.x+15, e.y+15, "#e67e22", 20); 
+            spawnParticles(e.x+15, e.y+15, "#f1c40f", 20); 
+            spawnParticles(e.x+15, e.y, "#7f8c8d", 15, "smoke");
             sfxExplosion(); shake(12); entities.splice(i, 1);
             if (e.isIce) { let ice = new Obstacle('ground'); ice.x = e.x; ice.color = "#00ffff"; entities.push(ice); }
         }
@@ -719,7 +820,7 @@ function defeatBoss() {
         if (boss.y < -200) {
             clearInterval(flyTimer); currentStage++;
             bossTargetPoints += 1000 + (currentStage * 500); boss = null; globalSpeed += 1;
-            ui.stage.innerText = stages[currentStage % 5].name; ui.stage.style.color = stages[currentStage % 5].fire;
+            ui.stage.innerText = stages[currentStage % 5].name; ui.stage.style.color = "#fff";
             gameState = 'PLAYING';
         }
     }, 16);
@@ -753,7 +854,7 @@ function startGame(e) {
     score = 0; distance = 0; frameCount = 0; currentStage = 0; globalSpeed = 8;
     bossTargetPoints = 1000; boss = null; gameState = 'PLAYING';
     
-    ui.stage.innerText = stages[0].name; ui.stage.style.color = stages[0].fire;
+    ui.stage.innerText = stages[0].name; ui.stage.style.color = "#fff";
     startSiren();
     if(!renderLoopStarted) { renderLoopStarted = true; requestAnimationFrame(gameLoop); }
 }
