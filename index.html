@@ -2,207 +2,368 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inner Balance: Yoga Quest</title>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA Meta Tags for iOS Safari -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="AuraSync">
+    <title>AuraSync - Sensor PWA</title>
+
+    <!-- Tailwind CSS for modern utility styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
     <style>
+        /* 2026 High-End Minimalist Aesthetics */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
+
+        :root {
+            --bg-color: #fbfbfd; /* Apple-esque off-white */
+            --text-main: #1d1d1f;
+            --accent-cyan: #00e5ff;
+            --accent-magenta: #ff00ea;
+        }
+
         body {
-            background-color: #111;
-            color: #fff;
-            font-family: 'Press Start 2P', monospace;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow: hidden; /* Prevent scrolling, true native app feel */
+            touch-action: none; /* Disable browser handling of gestures like swipe-to-go-back */
         }
-        #game-container {
-            width: 800px;
-            height: 600px;
-            background: linear-gradient(to bottom, #d48a4d, #8f9b4c);
-            position: relative;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8);
-            border: 4px solid #333;
-            overflow: hidden;
-        }
-        /* CRT Scanline Effect */
-        #game-container::after {
-            content: " ";
-            display: block;
+
+        /* Vibrant Blurred Aura Backgrounds */
+        .aura {
             position: absolute;
-            top: 0; left: 0; bottom: 0; right: 0;
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
-            z-index: 2;
-            background-size: 100% 4px, 6px 100%;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.6;
+            z-index: 0;
+            transition: all 0.3s ease-out;
+        }
+        .aura-1 {
+            width: 300px;
+            height: 300px;
+            background: var(--accent-cyan);
+            top: -100px;
+            left: -100px;
+        }
+        .aura-2 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent-magenta);
+            bottom: -150px;
+            right: -100px;
+        }
+
+        /* Glassmorphism Panels */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+            z-index: 10;
+        }
+
+        /* The Tilt Indicator */
+        #tilt-indicator {
+            transition: transform 0.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            will-change: transform;
+        }
+
+        /* Audio Visualizer Ring */
+        .audio-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            border: 2px solid rgba(0, 229, 255, 0.5);
+            transition: width 0.1s ease-out, height 0.1s ease-out, opacity 0.1s;
             pointer-events: none;
         }
-        #ui {
+
+        /* Touch Ripples */
+        .touch-ripple {
             position: absolute;
-            top: 0; left: 0; width: 100%;
-            padding: 20px;
-            box-sizing: border-box;
-            display: flex;
-            justify-content: space-between;
-            z-index: 3;
-            text-shadow: 2px 2px 0 #000;
+            border-radius: 50%;
+            background: rgba(29, 29, 31, 0.1);
+            transform: scale(0);
+            animation: ripple-anim 0.6s linear forwards;
+            pointer-events: none;
+            z-index: 20;
         }
-        #score-board { font-size: 20px; color: #ffeb3b; }
-        .meter-container { margin-bottom: 10px; font-size: 12px; }
-        progress {
-            width: 150px; height: 15px;
-            appearance: none; -webkit-appearance: none;
-            border: 2px solid #fff;
+
+        @keyframes ripple-anim {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
         }
-        progress::-webkit-progress-bar { background-color: #222; }
-        #balance-meter::-webkit-progress-value { background-color: #4caf50; }
-        #intensity-meter::-webkit-progress-value { background-color: #f44336; }
-        
-        #player {
-            position: absolute;
-            bottom: 50px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 60px; height: 100px;
-            background-color: #ff5722;
-            border: 4px solid #fff;
-            border-radius: 30px 30px 10px 10px;
-            z-index: 1;
-            transition: transform 0.1s;
-        }
-        #game-over {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+
+        /* Hide Scrollbar */
+        ::-webkit-scrollbar {
             display: none;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 10;
-            text-align: center;
-        }
-        button {
-            margin-top: 20px; padding: 15px 30px;
-            font-family: 'Press Start 2P', monospace;
-            background: #ff5722; color: #fff;
-            border: 4px solid #fff; cursor: pointer;
-        }
-        button:hover { background: #e64a19; }
-        #instructions {
-            position: absolute; bottom: 10px; width: 100%;
-            text-align: center; font-size: 10px; z-index: 3; text-shadow: 1px 1px 0 #000;
         }
     </style>
 </head>
-<body>
+<body class="relative w-screen h-screen">
 
-<div id="game-container">
-    <div id="ui">
-        <div id="score-board">SCORE: <span id="score">0</span></div>
-        <div id="meters">
-            <div class="meter-container">
-                BALANCE (Keep Centered)<br>
-                <progress id="balance-meter" value="50" max="100"></progress>
+    <!-- Ambient Aura Background -->
+    <div class="aura aura-1" id="aura1"></div>
+    <div class="aura aura-2" id="aura2"></div>
+
+    <!-- ONBOARDING / PERMISSION OVERLAY -->
+    <div id="onboarding" class="absolute inset-0 z-50 flex flex-col items-center justify-center p-6 bg-white/30 backdrop-blur-3xl transition-opacity duration-700">
+        <div class="glass-panel p-8 rounded-3xl w-full max-w-sm flex flex-col items-center text-center space-y-6">
+            <h1 class="text-3xl font-extrabold tracking-tight">AuraSync</h1>
+            <p class="text-sm text-gray-600 font-light leading-relaxed">
+                To experience the full game engine, we need to calibrate your iPhone's hardware sensors.
+            </p>
+            
+            <div class="w-full space-y-3 text-left">
+                <div class="flex items-center space-x-3 text-sm font-medium">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                    <span>Accelerometer & Gyro</span>
+                </div>
+                <div class="flex items-center space-x-3 text-sm font-medium">
+                    <span class="w-2 h-2 rounded-full bg-purple-400"></span>
+                    <span>Microphone (Breath/Wind)</span>
+                </div>
+                <div class="flex items-center space-x-3 text-sm font-medium">
+                    <span class="w-2 h-2 rounded-full bg-pink-400"></span>
+                    <span>Haptic Multi-touch</span>
+                </div>
             </div>
-            <div class="meter-container">
-                INTENSITY<br>
-                <progress id="intensity-meter" value="0" max="100"></progress>
-            </div>
+
+            <button id="start-btn" class="w-full py-4 mt-4 bg-black text-white rounded-2xl font-semibold tracking-wide shadow-xl shadow-black/20 active:scale-95 transition-transform">
+                Initiate Calibration
+            </button>
+        </div>
+        
+        <!-- Error Notification Box (Hidden by default) -->
+        <div id="error-box" class="hidden mt-6 bg-red-100/80 backdrop-blur-md border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm w-full max-w-sm text-center">
+            Message
         </div>
     </div>
-    
-    <div id="player"></div>
-    <div id="instructions">Use LEFT and RIGHT arrows to maintain balance!</div>
 
-    <div id="game-over">
-        <h2>NAMASKARAM.<br><br>FOCUS LOST.</h2>
-        <p>Final Score: <span id="final-score">0</span></p>
-        <button onclick="resetGame()">RESTART SADHANA</button>
+    <!-- MAIN GAME HUD -->
+    <div id="game-hud" class="absolute inset-0 z-10 flex flex-col items-center justify-between p-8 opacity-0 pointer-events-none transition-opacity duration-700">
+        
+        <!-- Top Stats / Header -->
+        <header class="w-full flex justify-between items-center glass-panel px-6 py-4 rounded-full mt-safe-top">
+            <div class="flex flex-col">
+                <span class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Stability</span>
+                <span id="stability-score" class="text-xl font-bold">100%</span>
+            </div>
+            <div class="flex flex-col text-right">
+                <span class="text-xs uppercase tracking-widest text-gray-400 font-semibold">Energy</span>
+                <span id="energy-score" class="text-xl font-bold">0</span>
+            </div>
+        </header>
+
+        <!-- Center Stage: The Core (Tilt & Audio visualizer) -->
+        <div class="relative w-64 h-64 flex items-center justify-center">
+            <!-- Audio Rings -->
+            <div id="audio-visualizer" class="audio-ring w-16 h-16"></div>
+            
+            <!-- Tilt Object (The "Core") -->
+            <div id="tilt-indicator" class="w-16 h-16 bg-black rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.3)] z-10 flex items-center justify-center relative">
+                <div class="w-4 h-4 bg-white rounded-full opacity-50"></div>
+            </div>
+            
+            <!-- Boundaries -->
+            <div class="absolute inset-0 border border-gray-200/50 rounded-full border-dashed pointer-events-none"></div>
+        </div>
+
+        <!-- Bottom Controls / Info -->
+        <footer class="w-full glass-panel px-6 py-4 rounded-3xl mb-safe-bottom flex flex-col space-y-2">
+            <div class="flex justify-between text-xs font-semibold text-gray-500">
+                <span>X: <span id="val-x">0</span></span>
+                <span>Y: <span id="val-y">0</span></span>
+            </div>
+            <div class="text-center text-sm font-medium text-gray-800">
+                Tilt to move. Blow to expand. Tap anywhere.
+            </div>
+        </footer>
     </div>
-</div>
 
-<script>
-    let score = 0;
-    let balance = 50; // 0 to 100, 50 is perfect
-    let intensity = 1;
-    let gameLoop;
-    let isGameOver = false;
-    let driftDirection = 1;
-
-    const scoreEl = document.getElementById('score');
-    const balanceMeter = document.getElementById('balance-meter');
-    const intensityMeter = document.getElementById('intensity-meter');
-    const playerEl = document.getElementById('player');
-    const gameOverScreen = document.getElementById('game-over');
-    const finalScoreEl = document.getElementById('final-score');
-
-    // Controls
-    let keys = { ArrowLeft: false, ArrowRight: false };
-
-    document.addEventListener('keydown', (e) => {
-        if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
-    });
-    document.addEventListener('keyup', (e) => {
-        if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
-    });
-
-    function update() {
-        if(isGameOver) return;
-
-        // Increase score and intensity over time
-        score += Math.floor(intensity);
-        scoreEl.innerText = score;
+    <script>
+        // DOM Elements
+        const onboarding = document.getElementById('onboarding');
+        const startBtn = document.getElementById('start-btn');
+        const errorBox = document.getElementById('error-box');
+        const gameHud = document.getElementById('game-hud');
         
-        intensity += 0.01; 
-        intensityMeter.value = intensity;
+        const tiltIndicator = document.getElementById('tilt-indicator');
+        const audioVisualizer = document.getElementById('audio-visualizer');
+        const valX = document.getElementById('val-x');
+        const valY = document.getElementById('val-y');
+        const energyScore = document.getElementById('energy-score');
+        const aura1 = document.getElementById('aura1');
+        const aura2 = document.getElementById('aura2');
 
-        // Apply random drift based on intensity
-        if (Math.random() < 0.05) {
-            driftDirection = Math.random() > 0.5 ? 1 : -1;
+        // Game State Variables
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let isRunning = false;
+        
+        // Tilt data
+        let targetX = 0;
+        let targetY = 0;
+        let currentX = 0;
+        let currentY = 0;
+        const maxTilt = 45; // Max angle to consider
+        const maxMove = 100; // Max pixels to move from center
+
+        // Utility: Show custom error
+        function showError(msg) {
+            errorBox.textContent = msg;
+            errorBox.classList.remove('hidden');
+            setTimeout(() => errorBox.classList.add('hidden'), 4000);
         }
-        
-        // The higher the intensity, the harder the drift pulls
-        balance += (driftDirection * (intensity * 0.15));
 
-        // Player input counteracts drift
-        if (keys.ArrowLeft) balance -= 1.5;
-        if (keys.ArrowRight) balance += 1.5;
+        // --- 1. INITIALIZATION & PERMISSIONS ---
+        startBtn.addEventListener('click', async () => {
+            try {
+                // Request Accelerometer (iOS 13+ requires user action)
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    const permissionState = await DeviceOrientationEvent.requestPermission();
+                    if (permissionState !== 'granted') {
+                        throw new Error("Tilt permission denied. Please allow in settings.");
+                    }
+                }
 
-        // Update UI
-        balanceMeter.value = balance;
-        
-        // Visual feedback on the "yogi" (player block tilts)
-        let tilt = (balance - 50) * 1.5; 
-        playerEl.style.transform = `translateX(-50%) rotate(${tilt}deg)`;
+                // Request Microphone (Web Audio API)
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                setupAudio(stream);
 
-        // Check fail state (balance hits 0 or 100)
-        if (balance <= 0 || balance >= 100) {
-            endGame();
-        } else {
-            gameLoop = requestAnimationFrame(update);
+                // Start Listening to Sensors
+                window.addEventListener('deviceorientation', handleOrientation);
+                
+                // Transition UI
+                onboarding.style.opacity = '0';
+                setTimeout(() => {
+                    onboarding.classList.add('hidden');
+                    gameHud.classList.remove('pointer-events-none');
+                    gameHud.style.opacity = '1';
+                    isRunning = true;
+                    gameLoop();
+                }, 700);
+
+            } catch (err) {
+                console.error(err);
+                showError(err.message || "Permissions denied or hardware unavailable.");
+            }
+        });
+
+        // --- 2. SENSOR: ACCELEROMETER / TILT ---
+        function handleOrientation(event) {
+            // beta is front-to-back tilt [-180, 180] (Y-axis visually)
+            // gamma is left-to-right tilt [-90, 90] (X-axis visually)
+            let x = event.gamma; 
+            let y = event.beta;
+
+            // Clamp values
+            if (x > maxTilt) x = maxTilt;
+            if (x < -maxTilt) x = -maxTilt;
+            if (y > maxTilt) y = maxTilt;
+            if (y < -maxTilt) y = -maxTilt;
+
+            // Map angle to pixel movement
+            targetX = (x / maxTilt) * maxMove;
+            targetY = (y / maxTilt) * maxMove;
+            
+            // Update HUD texts
+            valX.textContent = Math.round(x);
+            valY.textContent = Math.round(y);
         }
-    }
 
-    function endGame() {
-        isGameOver = true;
-        cancelAnimationFrame(gameLoop);
-        finalScoreEl.innerText = score;
-        gameOverScreen.style.display = 'flex';
-    }
+        // --- 3. SENSOR: MICROPHONE ---
+        function setupAudio(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256;
+            source.connect(analyser);
+            
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+        }
 
-    function resetGame() {
-        score = 0;
-        balance = 50;
-        intensity = 1;
-        isGameOver = false;
-        gameOverScreen.style.display = 'none';
-        playerEl.style.transform = `translateX(-50%) rotate(0deg)`;
-        gameLoop = requestAnimationFrame(update);
-    }
+        // --- 4. SENSOR: MULTI-TOUCH ---
+        document.body.addEventListener('touchstart', (e) => {
+            if (!isRunning) return;
+            
+            // Handle multiple simultaneous touches
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                createTouchRipple(e.changedTouches[i].pageX, e.changedTouches[i].pageY);
+                
+                // Interactivity: Move auras towards touch points slightly
+                aura1.style.transform = `translate(${(e.changedTouches[i].pageX - window.innerWidth/2) * 0.1}px, ${(e.changedTouches[i].pageY - window.innerHeight/2) * 0.1}px)`;
+            }
+        });
 
-    // Start Game
-    resetGame();
-</script>
+        function createTouchRipple(x, y) {
+            const ripple = document.createElement('div');
+            ripple.classList.add('touch-ripple');
+            // Size of ripple origin
+            const size = 50; 
+            ripple.style.width = `${size}px`;
+            ripple.style.height = `${size}px`;
+            ripple.style.left = `${x - size/2}px`;
+            ripple.style.top = `${y - size/2}px`;
+            
+            document.body.appendChild(ripple);
+            
+            // Clean up DOM after animation
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        }
 
+        // --- 5. RENDER LOOP (The "Engine") ---
+        function gameLoop() {
+            if (!isRunning) return;
+
+            // Smooth interpolation for the tilt core (Linear interpolation)
+            currentX += (targetX - currentX) * 0.1;
+            currentY += (targetY - currentY) * 0.1;
+            tiltIndicator.style.transform = `translate(${currentX}px, ${currentY}px)`;
+
+            // Audio Processing
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    sum += dataArray[i];
+                }
+                const averageVolume = sum / dataArray.length; // Range approx 0 - 100+
+                
+                // Visual response to audio
+                const ringSize = 64 + (averageVolume * 1.5);
+                audioVisualizer.style.width = `${ringSize}px`;
+                audioVisualizer.style.height = `${ringSize}px`;
+                audioVisualizer.style.opacity = averageVolume > 10 ? Math.min(1, averageVolume / 50) : 0;
+                
+                // Update Energy score
+                energyScore.textContent = Math.round(averageVolume);
+                
+                // React auras to loud noises
+                if (averageVolume > 40) {
+                    aura2.style.transform = 'scale(1.2)';
+                    aura2.style.background = '#ff2a54';
+                } else {
+                    aura2.style.transform = 'scale(1)';
+                    aura2.style.background = 'var(--accent-magenta)';
+                }
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+    </script>
 </body>
 </html>
+
