@@ -2,798 +2,207 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Ambulance Aurum & Abdul Roof</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inner Balance: Yoga Quest</title>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <style>
-        * { box-sizing: border-box; }
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #000; overflow: hidden;
-            font-family: 'Press Start 2P', monospace;
-            touch-action: none; 
-            user-select: none;
+        body {
+            background-color: #111;
             color: #fff;
-            -webkit-tap-highlight-color: transparent; 
+            font-family: 'Press Start 2P', monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
         }
-        
-        #gameCanvas {
-            display: block; width: 100%; height: 100%;
-            position: absolute; top: 0; left: 0; z-index: 1;
-            image-rendering: pixelated; 
-        }
-
-        /* Arcade CRT Scanline Effect */
-        .crt-overlay {
-            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.15) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-            background-size: 100% 3px, 3px 100%;
-            pointer-events: none; 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 99;
-            box-shadow: inset 0 0 100px rgba(0,0,0,0.9);
-        }
-
-        .overlay {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: rgba(0, 0, 0, 0.7); z-index: 100; text-align: center;
-            pointer-events: auto;
-            backdrop-filter: blur(4px);
-            -webkit-backdrop-filter: blur(4px);
-        }
-        
-        h1 {
-            font-size: 28px; text-shadow: 4px 4px 0px #c0392b, -2px -2px 0px #3498db; line-height: 1.5; margin-bottom: 10px;
-            padding: 0 20px; animation: pulseTitle 2s infinite;
-        }
-
-        @keyframes pulseTitle {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-        }
-        
-        .btn {
-            background: #f1c40f; color: #000; border: 4px solid #fff;
-            padding: 15px 30px; font-size: 18px; font-family: inherit;
-            cursor: pointer; text-transform: uppercase; margin-top: 20px;
-            box-shadow: 6px 6px 0px #d35400;
-            pointer-events: auto;
+        #game-container {
+            width: 800px;
+            height: 600px;
+            background: linear-gradient(to bottom, #d48a4d, #8f9b4c);
             position: relative;
-            z-index: 101;
-            transition: all 0.1s;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8);
+            border: 4px solid #333;
+            overflow: hidden;
         }
-        .btn:active { box-shadow: 0px 0px 0px #d35400; transform: translate(6px, 6px); }
-
-        .stats { margin-top: 20px; font-size: 14px; color: #3498db; text-shadow: 2px 2px 0px #000; }
-        .controls-hint { margin-top: 40px; font-size: 10px; color: #ecf0f1; line-height: 2; max-width: 80%; background: rgba(0,0,0,0.5); padding: 10px; border: 2px dashed #fff; }
-
-        #hud {
-            position: absolute; top: 0; left: 0; width: 100%; padding: 15px;
-            display: flex; justify-content: space-between; align-items: flex-start;
-            pointer-events: none; z-index: 90; text-shadow: 2px 2px 0px #000;
+        /* CRT Scanline Effect */
+        #game-container::after {
+            content: " ";
+            display: block;
+            position: absolute;
+            top: 0; left: 0; bottom: 0; right: 0;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            z-index: 2;
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
         }
-        
-        .hud-left { display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
-        .hud-right { text-align: right; font-size: 12px; color: #f1c40f; pointer-events: none; }
-        #scoreDisplay { font-size: 24px; color: #2ecc71; text-shadow: 3px 3px 0px #27ae60; }
-        #distDisplay { font-size: 12px; color: #fff; }
-        #stageDisplay { font-size: 14px; margin-top: 5px; color: #e74c3c; animation: blink 1s infinite; text-shadow: 2px 2px 0px #c0392b;}
-        #powerupDisplay { font-size: 14px; color: #9b59b6; margin-top: 5px; text-shadow: 2px 2px 0px #8e44ad; }
-        #bossHpDisplay { font-size: 16px; margin-top: 10px; color: #e74c3c; background: rgba(0,0,0,0.5); padding: 5px; border: 2px solid #e74c3c; }
-
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        
-        .hidden { display: none !important; }
-        
-        #orientationWarning {
-            display: none; background: #000; z-index: 999;
+        #ui {
+            position: absolute;
+            top: 0; left: 0; width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            z-index: 3;
+            text-shadow: 2px 2px 0 #000;
         }
-        @media screen and (orientation: portrait) {
-            #orientationWarning { display: flex; }
+        #score-board { font-size: 20px; color: #ffeb3b; }
+        .meter-container { margin-bottom: 10px; font-size: 12px; }
+        progress {
+            width: 150px; height: 15px;
+            appearance: none; -webkit-appearance: none;
+            border: 2px solid #fff;
+        }
+        progress::-webkit-progress-bar { background-color: #222; }
+        #balance-meter::-webkit-progress-value { background-color: #4caf50; }
+        #intensity-meter::-webkit-progress-value { background-color: #f44336; }
+        
+        #player {
+            position: absolute;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px; height: 100px;
+            background-color: #ff5722;
+            border: 4px solid #fff;
+            border-radius: 30px 30px 10px 10px;
+            z-index: 1;
+            transition: transform 0.1s;
+        }
+        #game-over {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            text-align: center;
+        }
+        button {
+            margin-top: 20px; padding: 15px 30px;
+            font-family: 'Press Start 2P', monospace;
+            background: #ff5722; color: #fff;
+            border: 4px solid #fff; cursor: pointer;
+        }
+        button:hover { background: #e64a19; }
+        #instructions {
+            position: absolute; bottom: 10px; width: 100%;
+            text-align: center; font-size: 10px; z-index: 3; text-shadow: 1px 1px 0 #000;
         }
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas"></canvas>
-    <div class="crt-overlay"></div>
-
-    <div id="hud" class="hidden">
-        <div class="hud-left">
-            <div id="scoreDisplay">000000</div>
-            <div id="distDisplay">0m</div>
-            <div id="powerupDisplay"></div>
-        </div>
-        <div class="hud-right">
-            <div id="stageDisplay">STAGE 1: CITY</div>
-            <div id="bossHpDisplay" class="hidden">BOSS HP: 3</div>
-        </div>
-    </div>
-
-    <div id="startScreen" class="overlay">
-        <h1>AMBULANCE AURUM<br>& ABDUL ROOF</h1>
-        <div class="stats">HIGH SCORE: <span id="hiScoreMenu">0</span></div>
-        <button class="btn" id="startBtnEl">START ENGINE</button>
-        <div class="controls-hint">
-            TAP LEFT HALF: Jump & Double Jump<br>
-            TAP BOTTOM RIGHT: Shoot Straight<br>
-            TAP TOP RIGHT: Shoot 45&deg; Up
+<div id="game-container">
+    <div id="ui">
+        <div id="score-board">SCORE: <span id="score">0</span></div>
+        <div id="meters">
+            <div class="meter-container">
+                BALANCE (Keep Centered)<br>
+                <progress id="balance-meter" value="50" max="100"></progress>
+            </div>
+            <div class="meter-container">
+                INTENSITY<br>
+                <progress id="intensity-meter" value="0" max="100"></progress>
+            </div>
         </div>
     </div>
+    
+    <div id="player"></div>
+    <div id="instructions">Use LEFT and RIGHT arrows to maintain balance!</div>
 
-    <div id="gameOverScreen" class="overlay hidden">
-        <h1 style="color: #e74c3c; text-shadow: 4px 4px 0px #c0392b;">WRECKED!</h1>
-        <div class="stats" style="color: #fff; font-size: 20px;">SCORE: <span id="finalScore">0</span></div>
-        <div class="stats">HIGH SCORE: <span id="hiScoreEnd">0</span></div>
-        <button class="btn" id="restartBtnEl">TRY AGAIN</button>
+    <div id="game-over">
+        <h2>NAMASKARAM.<br><br>FOCUS LOST.</h2>
+        <p>Final Score: <span id="final-score">0</span></p>
+        <button onclick="resetGame()">RESTART SADHANA</button>
     </div>
-
-    <div id="orientationWarning" class="overlay">
-        <h2 style="color: #f1c40f; text-align:center; padding: 20px; line-height: 1.5; text-shadow: 2px 2px 0 #000;">PLEASE ROTATE<br>YOUR PHONE<br>TO LANDSCAPE</h2>
-    </div>
+</div>
 
 <script>
-/** * AUDIO ENGINE */
-const AudioContext = window.AudioContext || window.webkitAudioContext;
-let audioCtx;
-let sirenInterval = null;
-let sirenToggle = false;
+    let score = 0;
+    let balance = 50; // 0 to 100, 50 is perfect
+    let intensity = 1;
+    let gameLoop;
+    let isGameOver = false;
+    let driftDirection = 1;
 
-function initAudio() {
-    if (!audioCtx) audioCtx = new AudioContext();
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-}
+    const scoreEl = document.getElementById('score');
+    const balanceMeter = document.getElementById('balance-meter');
+    const intensityMeter = document.getElementById('intensity-meter');
+    const playerEl = document.getElementById('player');
+    const gameOverScreen = document.getElementById('game-over');
+    const finalScoreEl = document.getElementById('final-score');
 
-function playTone(freq, type, duration, vol=0.1) {
-    if(!audioCtx || audioCtx.state === 'suspended') return;
-    try {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = type;
-        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-        gain.gain.setValueAtTime(vol, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
-        osc.connect(gain); gain.connect(audioCtx.destination);
-        osc.start(); osc.stop(audioCtx.currentTime + duration);
-    } catch(e) {}
-}
+    // Controls
+    let keys = { ArrowLeft: false, ArrowRight: false };
 
-function sfxJump() { playTone(300, 'square', 0.15, 0.05); setTimeout(()=>playTone(500, 'square', 0.15, 0.05), 80); }
-function sfxShoot() { playTone(800, 'sawtooth', 0.1, 0.05); }
-function sfxNail() { playTone(1400, 'square', 0.05, 0.05); }
-function sfxExplosion() { playTone(100, 'sawtooth', 0.5, 0.2); setTimeout(()=>playTone(50, 'square', 0.4, 0.2), 50); }
-function sfxPowerup() { playTone(800, 'sine', 0.1, 0.1); setTimeout(()=>playTone(1200, 'sine', 0.2, 0.1), 100); }
-function sfxBossHit() { playTone(200, 'square', 0.2, 0.1); }
+    document.addEventListener('keydown', (e) => {
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
+    });
+    document.addEventListener('keyup', (e) => {
+        if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
+    });
 
-function startSiren() {
-    if(sirenInterval) clearInterval(sirenInterval);
-    sirenInterval = setInterval(() => {
-        if(gameState !== 'PLAYING' && gameState !== 'BOSS') return;
-        sirenToggle = !sirenToggle;
-        playTone(sirenToggle ? 650 : 850, 'sine', 0.4, 0.02);
-    }, 400);
-}
-function stopSiren() { clearInterval(sirenInterval); sirenInterval = null; }
+    function update() {
+        if(isGameOver) return;
 
-/** * GAME ENGINE & RESIZE */
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d', { alpha: false });
-
-let W, H, GROUND_Y, dpr;
-function resize() {
-    W = window.innerWidth; H = window.innerHeight;
-    GROUND_Y = H * 0.82; // Dynamic ground
-    dpr = window.devicePixelRatio || 1;
-    canvas.width = W * dpr; canvas.height = H * dpr;
-    ctx.scale(dpr, dpr);
-    ctx.imageSmoothingEnabled = false;
-}
-window.addEventListener('resize', resize);
-window.addEventListener('orientationchange', () => setTimeout(resize, 100));
-resize();
-
-// UI Elements
-const ui = {
-    start: document.getElementById('startScreen'), over: document.getElementById('gameOverScreen'),
-    hud: document.getElementById('hud'), score: document.getElementById('scoreDisplay'),
-    dist: document.getElementById('distDisplay'), stage: document.getElementById('stageDisplay'),
-    bossHp: document.getElementById('bossHpDisplay'), power: document.getElementById('powerupDisplay'),
-    hiMenu: document.getElementById('hiScoreMenu'), hiEnd: document.getElementById('hiScoreEnd'),
-    startBtn: document.getElementById('startBtnEl'), restartBtn: document.getElementById('restartBtnEl')
-};
-
-let highScore = localStorage.getItem('ambulanceHighScore') || 0;
-ui.hiMenu.innerText = highScore;
-
-// Game State
-let gameState = 'MENU';
-let score = 0, distance = 0, frameCount = 0, currentStage = 0;
-let globalSpeed = 6, screenShake = 0, bossTargetPoints = 1000; 
-let renderLoopStarted = false;
-
-// Palettes and background info per stage
-const stages = [
-    { name: "STAGE 1: CITY", bg: "#1a1a2e", sky: "#0f3460", mid: "#16213e", ground: "#111", line: "#f1c40f", obs: "#7f8c8d", fire: "#e67e22", roof: "#3498db" },
-    { name: "STAGE 2: DESERT", bg: "#d35400", sky: "#e67e22", mid: "#a04000", ground: "#873600", line: "#f39c12", obs: "#6e2c00", fire: "#f1c40f", roof: "#e74c3c" },
-    { name: "STAGE 3: TUNDRA", bg: "#1e3799", sky: "#4a69bd", mid: "#0c2461", ground: "#0a3d62", line: "#82ccdd", obs: "#dff9fb", fire: "#7ed6df", roof: "#ecf0f1" },
-    { name: "STAGE 4: CYBER", bg: "#2c003e", sky: "#510a32", mid: "#190028", ground: "#000", line: "#ff007f", obs: "#00ffcc", fire: "#ff007f", roof: "#f368e0" },
-    { name: "STAGE 5: VOLCANO", bg: "#2d0000", sky: "#4a0000", mid: "#1a0000", ground: "#000", line: "#c0392b", obs: "#333", fire: "#ff3f34", roof: "#ffb142" }
-];
-
-let player, entities = [], particles = [], projectiles = [], floatingTexts = [], boss = null;
-
-/** * GRAPHICS UTILS */
-function drawRect(x, y, w, h, color) { ctx.fillStyle = color; ctx.fillRect(Math.floor(x), Math.floor(y), Math.floor(w), Math.floor(h)); }
-function drawGlow(x, y, radius, color) {
-    let grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    grad.addColorStop(0, color); grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI*2); ctx.fill();
-}
-
-/** * CLASSES */
-class Player {
-    constructor() {
-        this.w = 90; this.h = 45;
-        this.x = 100; this.y = GROUND_Y - this.h;
-        this.dy = 0; this.gravity = 0.65; this.jumpPower = -12.5;
-        this.jumps = 0; this.maxJumps = 1; this.lightTimer = 0;
-        this.wheelAngle = 0; this.recoil = 0;
+        // Increase score and intensity over time
+        score += Math.floor(intensity);
+        scoreEl.innerText = score;
         
-        this.p_multi = 0; this.p_invinc = 0; this.p_spread = 0; this.p_ice = 0;
-        this.multiplier = 1;
-    }
-    jump() {
-        if (this.jumps < this.maxJumps) {
-            this.dy = this.jumpPower; this.jumps++; sfxJump();
-            spawnParticles(this.x + 20, GROUND_Y, "#fff", 5);
+        intensity += 0.01; 
+        intensityMeter.value = intensity;
+
+        // Apply random drift based on intensity
+        if (Math.random() < 0.05) {
+            driftDirection = Math.random() > 0.5 ? 1 : -1;
         }
-    }
-    shoot(angleUp = false) {
-        let type = gameState === 'BOSS' ? 'nail' : (this.p_ice > 0 ? 'ice' : 'water');
-        let yOffset = gameState === 'BOSS' ? -25 : -20;
-        let vy = angleUp ? -6 : 0, vx = 14;
         
-        projectiles.push(new Projectile(this.x + 60, this.y + yOffset, vx, vy, type));
-        if (this.p_spread > 0) {
-            projectiles.push(new Projectile(this.x + 60, this.y + yOffset - 8, vx, vy - 2, type));
-            projectiles.push(new Projectile(this.x + 60, this.y + yOffset + 8, vx, vy + 2, type));
-        }
-        this.recoil = 10;
-        if(gameState === 'BOSS') sfxNail(); else sfxShoot();
-    }
-    update() {
-        this.dy += this.gravity; this.y += this.dy;
-        if (this.y + this.h >= GROUND_Y) { this.y = GROUND_Y - this.h; this.dy = 0; this.jumps = 0; }
+        // The higher the intensity, the harder the drift pulls
+        balance += (driftDirection * (intensity * 0.15));
 
-        this.wheelAngle += (globalSpeed * 0.1);
-        this.lightTimer++;
-        if (this.recoil > 0) this.recoil--;
+        // Player input counteracts drift
+        if (keys.ArrowLeft) balance -= 1.5;
+        if (keys.ArrowRight) balance += 1.5;
 
-        if (frameCount % 3 === 0 && this.y + this.h >= GROUND_Y) {
-            particles.push(new Particle(this.x - 5, this.y + this.h - 5, "#7f8c8d", "smoke"));
-        }
+        // Update UI
+        balanceMeter.value = balance;
+        
+        // Visual feedback on the "yogi" (player block tilts)
+        let tilt = (balance - 50) * 1.5; 
+        playerEl.style.transform = `translateX(-50%) rotate(${tilt}deg)`;
 
-        if (this.p_invinc > 0) this.p_invinc--;
-        if (this.p_spread > 0) this.p_spread--;
-        if (this.p_ice > 0) this.p_ice--;
-        if (this.p_multi > 0) { this.p_multi--; this.multiplier = 2; } else { this.multiplier = 1; this.maxJumps = 1; }
-    }
-    draw() {
-        if (this.p_invinc > 0 && frameCount % 4 < 2) return;
-        
-        let bx = this.x, by = this.y;
-        
-        // --- AMBULANCE BODY ---
-        drawRect(bx, by, 80, this.h - 10, "#ecf0f1");
-        ctx.fillStyle = "#ecf0f1";
-        ctx.beginPath(); ctx.moveTo(bx + 80, by + 15); ctx.lineTo(bx + 100, by + 25); ctx.lineTo(bx + 100, by + this.h - 10); ctx.lineTo(bx + 80, by + this.h - 10); ctx.fill();
-        drawRect(bx + 95, by + 26, 6, 8, "#7f8c8d");
-        drawRect(bx - 5, by + this.h - 12, 110, 6, "#95a5a6");
-        
-        drawRect(bx, by + 20, 85, 8, "#e74c3c"); // Stripe
-        
-        // Windows
-        drawRect(bx + 60, by + 5, 20, 12, "#2c3e50"); 
-        ctx.beginPath(); ctx.moveTo(bx + 80, by + 5); ctx.lineTo(bx + 92, by + 15); ctx.lineTo(bx + 80, by + 15); ctx.fillStyle = "#2c3e50"; ctx.fill(); 
-        drawRect(bx + 65, by + 5, 5, 12, "rgba(255,255,255,0.2)");
-        
-        // Red Cross
-        drawRect(bx + 25, by + 10, 20, 8, "#e74c3c");
-        drawRect(bx + 31, by + 4, 8, 20, "#e74c3c");
-
-        // Headlight Beam
-        if (gameState !== 'GAMEOVER') {
-            ctx.fillStyle = "rgba(241, 196, 15, 0.15)";
-            ctx.beginPath(); ctx.moveTo(bx + 100, by + 28); ctx.lineTo(bx + 300, by - 20); ctx.lineTo(bx + 300, by + 60); ctx.fill();
-            drawRect(bx + 98, by + 26, 3, 5, "#f1c40f"); 
-        }
-
-        // Siren Light
-        let sirenColor = Math.floor(this.lightTimer / 8) % 2 === 0 ? "rgba(255,0,0,0.8)" : "rgba(0,100,255,0.8)";
-        drawRect(bx + 15, by - 8, 15, 8, "#111");
-        drawRect(bx + 17, by - 6, 11, 6, sirenColor);
-        drawGlow(bx + 22, by - 3, 30, sirenColor.replace('0.8', '0.4'));
-
-        // --- ABDUL ROOF ---
-        let ax = bx + 45, ay = by - 15;
-        drawRect(ax, ay, 15, 15, stages[currentStage % 5].roof);
-        drawRect(ax + 2, ay - 12, 11, 12, "#f1c40f");
-        drawRect(ax + 6, ay - 9, 8, 4, "#000"); // Shades
-        
-        // Weapon & Arm 
-        let armX = ax + 5 - this.recoil;
-        drawRect(armX, ay + 4, 15, 4, "#e67e22"); 
-        if (gameState === 'BOSS') {
-            drawRect(armX + 10, ay + 2, 12, 6, "#7f8c8d"); // Nailgun
-            drawRect(armX + 18, ay + 6, 4, 6, "#333");
+        // Check fail state (balance hits 0 or 100)
+        if (balance <= 0 || balance >= 100) {
+            endGame();
         } else {
-            drawRect(armX + 10, ay + 2, 15, 5, "#3498db"); // Hose
-            drawRect(armX + 22, ay + 1, 4, 7, "#bdc3c7");
-        }
-
-        // Scarf
-        let wave = Math.sin(frameCount * 0.3) * 5;
-        for(let i=0; i<4; i++) { drawRect(ax - (i*5) - 5, ay + 2 + Math.sin(frameCount*0.2 + i)*3, 6, 4, "#c0392b"); }
-
-        this.drawWheel(bx + 15, by + this.h - 10);
-        this.drawWheel(bx + 75, by + this.h - 10);
-    }
-    
-    drawWheel(wx, wy) {
-        ctx.save(); ctx.translate(wx, wy); ctx.rotate(this.wheelAngle);
-        ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.fillStyle = "#111"; ctx.fill();
-        ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fillStyle = "#bdc3c7"; ctx.fill();
-        ctx.fillStyle = "#7f8c8d"; ctx.fillRect(-6, -1, 12, 2); ctx.fillRect(-1, -6, 2, 12);
-        ctx.restore();
-    }
-}
-
-class Obstacle {
-    constructor(type) {
-        this.x = W; this.w = 30; this.h = 40; this.type = type; this.passed = false;
-        this.y = GROUND_Y - this.h;
-        this.anim = Math.random() * 100;
-        
-        if (type === 'air') {
-            this.y = GROUND_Y - 70 - Math.random() * 50;
-            this.w = 24; this.h = 24;
-            this.color = stages[currentStage % 5].fire;
-        } else if (type === 'powerup') {
-            this.y = GROUND_Y - 50 - Math.random() * 60;
-            this.w = 26; this.h = 26;
-            const pTypes = ['spread', 'ice', 'jump', 'star', 'multi'];
-            this.powerType = pTypes[Math.floor(Math.random() * pTypes.length)];
-            this.color = "#9b59b6";
-        } else {
-            this.color = stages[currentStage % 5].obs;
-        }
-    }
-    update() {
-        this.x -= globalSpeed;
-        this.anim += 0.2;
-        if (!this.passed && this.x + this.w < player.x && this.type === 'ground') { this.passed = true; addScore(20); }
-    }
-    draw() {
-        let x = this.x, y = this.y;
-        if(this.type === 'powerup') {
-            y += Math.sin(this.anim) * 5;
-            drawRect(x, y, this.w, this.h, this.color);
-            drawRect(x+4, y+4, this.w-8, this.h-8, "#8e44ad");
-            drawRect(x+10, y+10, 6, 6, "#fff"); 
-            drawGlow(x+this.w/2, y+this.h/2, 30, "rgba(155, 89, 182, 0.4)");
-        } else if (this.type === 'air') {
-            drawGlow(x+this.w/2, y+this.h/2, 25, this.color === '#ff007f' ? 'rgba(255,0,127,0.5)' : 'rgba(230, 126, 34, 0.5)');
-            drawRect(x, y + Math.sin(this.anim)*2, this.w, this.h, this.color);
-            drawRect(x - 5, y + 5 + Math.sin(this.anim)*2, 5, 14, "#c0392b"); 
-            drawRect(x + 5, y + 5 + Math.sin(this.anim)*2, 14, 14, "#fff"); 
-        } else {
-            drawRect(x, y, this.w, this.h, this.color);
-            drawRect(x, y, this.w, 5, "rgba(255,255,255,0.3)"); 
-            drawRect(x + this.w - 5, y, 5, this.h, "rgba(0,0,0,0.3)"); 
-            drawRect(x, y + 10, this.w, 8, "#e67e22");
-            drawRect(x, y + 25, this.w, 8, "#e67e22");
-        }
-    }
-}
-
-class Boss {
-    constructor() {
-        this.w = 90; this.h = 110; this.x = W + 100;
-        this.y = GROUND_Y - this.h - 20;
-        this.hp = 3 + (currentStage * 2); this.maxHp = this.hp;
-        this.state = 'entering'; this.throwTimer = 0; this.hurtFlash = 0;
-    }
-    update() {
-        if (this.state === 'entering') {
-            this.x -= 3; if (this.x <= W - 140) this.state = 'active';
-        } else if (this.state === 'active') {
-            this.y = GROUND_Y - this.h - 30 + Math.sin(frameCount * 0.08) * 15;
-            this.throwTimer++;
-            let attackRate = Math.max(35, 90 - (currentStage * 10));
-            if (this.throwTimer > attackRate) { this.throwTimer = 0; this.throwTank(); }
-        }
-    }
-    throwTank() {
-        let r = Math.random(), type = 'fastball';
-        if (currentStage >= 1 && r > 0.4) type = 'bouncer';
-        if (currentStage >= 2 && r > 0.7) type = 'raindrop';
-        if (currentStage >= 4 && r > 0.9) {
-            entities.push(new GasTank('fastball', this.x, this.y + 40));
-            setTimeout(() => entities.push(new GasTank('bouncer', this.x, this.y + 40)), 200);
-            return;
-        }
-        entities.push(new GasTank(type, this.x, this.y + 40));
-    }
-    draw() {
-        let bx = this.x, by = this.y;
-        let skin = "#e0ac69";
-        
-        // --- Hover Platform ---
-        drawRect(bx - 10, by + 95, 110, 15, "#34495e");
-        drawRect(bx - 10, by + 100, 110, 5, "#f1c40f"); // Yellow warning stripe
-        let flameH = 15 + Math.random() * 15;
-        drawRect(bx + 10, by + 110, 15, flameH, "#e67e22");
-        drawRect(bx + 65, by + 110, 15, flameH, "#e67e22");
-
-        // --- Tank Backpack ---
-        drawRect(bx + 55, by + 20, 40, 55, "#c0392b");
-        drawRect(bx + 60, by + 15, 30, 5, "#7f8c8d"); // Cap
-        drawRect(bx + 50, by + 30, 10, 30, "#333"); // Straps
-
-        // --- Legs ---
-        drawRect(bx + 25, by + 70, 40, 25, "#2c3e50"); // Jeans
-        drawRect(bx + 25, by + 90, 15, 5, "#111"); // Shoe L
-        drawRect(bx + 50, by + 90, 15, 5, "#111"); // Shoe R
-
-        // --- Torso ---
-        drawRect(bx + 25, by + 35, 40, 35, "#27ae60"); // Rugged Green Vest
-        
-        // --- Head ---
-        drawRect(bx + 30, by + 5, 28, 30, skin);
-        
-        // Red Bandana
-        drawRect(bx + 28, by + 5, 32, 8, "#e74c3c");
-        // Bandana tail waving in the wind
-        let tailY = by + 8 + Math.sin(frameCount * 0.2) * 3;
-        drawRect(bx + 55, tailY, 15, 6, "#e74c3c"); 
-
-        // Thick Black Beard & Hair
-        drawRect(bx + 25, by + 22, 12, 18, "#111"); // Front beard
-        drawRect(bx + 30, by + 30, 25, 10, "#111"); // Bottom beard
-        drawRect(bx + 50, by + 13, 10, 17, "#111"); // Back hair
-
-        // Angry Eye (Facing Left towards Ambulance)
-        let eyeY = by + 15 + Math.sin(frameCount * 0.1) * 1;
-        drawRect(bx + 28, eyeY, 8, 6, "#fff");
-        drawRect(bx + 28, eyeY + 1, 4, 4, "#000"); // Pupil
-        // Eyebrow angled down angrily
-        ctx.fillStyle = "#111";
-        ctx.beginPath(); ctx.moveTo(bx + 26, eyeY - 2); ctx.lineTo(bx + 38, eyeY + 3); ctx.lineTo(bx + 38, eyeY - 2); ctx.fill();
-
-        // --- Arms ---
-        // Back arm holding backpack
-        drawRect(bx + 45, by + 40, 12, 25, skin);
-        
-        // Front arm wind-up logic based on throw timer
-        let attackRate = Math.max(35, 90 - (currentStage * 10));
-        let throwPhase = this.throwTimer / attackRate;
-        
-        if (throwPhase > 0.8) {
-            // Winding up to throw (arm pulled back/up)
-            drawRect(bx + 30, by + 25, 12, 25, skin); 
-            drawRect(bx + 15, by + 25, 20, 12, skin); 
-        } else {
-            // Arm resting / preparing
-            drawRect(bx + 15, by + 45, 25, 12, skin);
-        }
-
-        // Damage flash
-        if (this.hurtFlash > 0) {
-            drawRect(bx - 15, by, this.w + 30, this.h + 25, "rgba(255, 255, 255, 0.8)");
-            this.hurtFlash--;
-        }
-    }
-}
-
-class GasTank {
-    constructor(type, x, y) {
-        this.x = x; this.y = y; this.w = 34; this.h = 16; this.type = type;
-        this.rot = 0;
-        if (type === 'fastball') { this.dx = -10 - currentStage; this.dy = 0; this.g = 0; }
-        else if (type === 'bouncer') { this.dx = -7 - currentStage; this.dy = -3; this.g = 0.5; }
-        else if (type === 'raindrop') { this.dx = -4; this.dy = -16; this.g = 0.35; }
-        this.isIce = currentStage >= 2;
-    }
-    update() {
-        this.x += this.dx; this.dy += this.g; this.y += this.dy;
-        this.rot -= 0.1;
-        if (this.y + this.h >= GROUND_Y && this.type === 'bouncer') {
-            this.y = GROUND_Y - this.h; this.dy = -9;
-        }
-    }
-    draw() {
-        ctx.save(); ctx.translate(this.x + this.w/2, this.y + this.h/2); 
-        if(this.type === 'raindrop') ctx.rotate(this.rot);
-        
-        let c = this.isIce ? "#7ed6df" : "#7f8c8d";
-        drawRect(-this.w/2, -this.h/2, this.w, this.h, c);
-        drawRect(-this.w/2 + 5, -this.h/2, 5, this.h, "rgba(255,255,255,0.3)");
-        drawRect(-this.w/2 - 6, -this.h/2 + 2, 6, 12, "#c0392b"); // Nozzle
-        drawRect(-this.w/2 + 15, -this.h/2 + 4, 10, 8, "#f1c40f"); // Warning label
-        
-        ctx.restore();
-    }
-}
-
-class Projectile {
-    constructor(x, y, dx, dy, type) {
-        this.x = x; this.y = y; this.dx = dx; this.dy = dy; this.type = type;
-        this.w = type === 'nail' ? 12 : 24; this.h = type === 'nail' ? 4 : 8; this.active = true;
-    }
-    update() { this.x += this.dx; this.y += this.dy; if(this.x > W || this.y < 0) this.active = false; }
-    draw() {
-        let c = this.type === 'water' ? "#3498db" : (this.type === 'ice' ? "#00ffff" : "#bdc3c7");
-        drawRect(this.x, this.y, this.w, this.h, c);
-        if(this.type === 'water') drawRect(this.x, this.y + 2, this.w, 4, "#85c1e9"); // highlight
-    }
-}
-
-class Particle {
-    constructor(x, y, color, type="spark") {
-        this.x = x; this.y = y; this.color = color; this.type = type;
-        this.life = 1.0;
-        if (type === "smoke") {
-            this.dx = -2 - Math.random()*2; this.dy = -0.5 - Math.random();
-            this.size = 4 + Math.random()*6; this.decay = 0.02;
-        } else {
-            this.dx = (Math.random() - 0.5) * 12; this.dy = (Math.random() - 0.5) * 12;
-            this.size = 3 + Math.random()*4; this.decay = 0.04 + Math.random()*0.03;
-        }
-    }
-    update() { 
-        this.x += this.dx; this.y += this.dy; this.life -= this.decay; 
-        if(this.type === "smoke") { this.size += 0.2; this.dy -= 0.05; }
-    }
-    draw() {
-        ctx.globalAlpha = Math.max(0, this.life); 
-        drawRect(this.x, this.y, this.size, this.size, this.color); 
-        ctx.globalAlpha = 1.0;
-    }
-}
-
-class FloatingText {
-    constructor(x, y, text, color) {
-        this.x = x; this.y = y; this.text = text; this.color = color; this.life = 1.0; this.dy = -2.5;
-    }
-    update() { this.y += this.dy; this.life -= 0.02; }
-    draw() {
-        ctx.globalAlpha = Math.max(0, this.life); ctx.fillStyle = this.color;
-        ctx.font = "14px 'Press Start 2P'"; 
-        ctx.shadowColor = "#000"; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
-        ctx.fillText(this.text, this.x, this.y); 
-        ctx.shadowColor = "transparent"; ctx.globalAlpha = 1.0;
-    }
-}
-
-/** * BACKGROUND SYSTEM */
-class ParallaxBackground {
-    draw() {
-        let stg = stages[currentStage % 5];
-        
-        ctx.fillStyle = stg.bg; ctx.fillRect(0, 0, W, H);
-        
-        // Skyline 
-        let skyOffset = (distance * 0.5) % 200;
-        ctx.fillStyle = stg.sky;
-        for(let i = -200; i < W + 200; i += 200) {
-            let x = i - skyOffset;
-            drawRect(x, GROUND_Y - 150, 60, 150, stg.sky);
-            drawRect(x + 70, GROUND_Y - 200, 80, 200, stg.sky);
-            drawRect(x + 160, GROUND_Y - 120, 40, 120, stg.sky);
-        }
-
-        // Midground
-        let midOffset = (distance * 2) % 150;
-        ctx.fillStyle = stg.mid;
-        for(let i = -150; i < W + 150; i += 150) {
-            let x = i - midOffset;
-            drawRect(x, GROUND_Y - 50, 40, 50, stg.mid);
-            drawRect(x + 60, GROUND_Y - 80, 50, 80, stg.mid);
-        }
-
-        // Ground base
-        drawRect(0, GROUND_Y, W, H - GROUND_Y, stg.ground);
-        
-        // Fast moving road lines
-        let lineOffset = (distance * 6) % 100;
-        ctx.fillStyle = stg.line;
-        for(let i = -100; i < W; i+= 100) {
-            drawRect(i - lineOffset, GROUND_Y + 30, 50, 8, stg.line);
-        }
-        
-        drawRect(0, GROUND_Y, W, 8, stg.obs);
-    }
-}
-const bg = new ParallaxBackground();
-
-// Utils
-function spawnParticles(x, y, color, count=10, type="spark") { for(let i=0; i<count; i++) particles.push(new Particle(x, y, color, type)); }
-function addScore(pts) { score += pts * player.multiplier; ui.score.innerText = Math.floor(score).toString().padStart(6, '0'); }
-function shake(amt) { screenShake = amt; }
-function checkCollision(r1, r2) { let p = 6; return !(r2.x > r1.x + r1.w - p || r2.x + r2.w < r1.x + p || r2.y > r1.y + r1.h - p || r2.y + r2.h < r1.y + p); }
-
-/** * MAIN LOOP */
-function update() {
-    if (gameState === 'MENU' || gameState === 'GAMEOVER') return;
-    frameCount++; player.update();
-    
-    if (gameState === 'PLAYING') {
-        distance += (globalSpeed / 60); ui.dist.innerText = Math.floor(distance) + 'm'; addScore(0.1);
-        if (frameCount % 60 === 0) {
-            let r = Math.random();
-            if (r < 0.1) entities.push(new Obstacle('powerup'));
-            else if (r < 0.45) entities.push(new Obstacle('air'));
-            else entities.push(new Obstacle('ground'));
-        }
-        if(frameCount % 600 === 0 && globalSpeed < 16) globalSpeed += 0.5;
-
-        if (score >= bossTargetPoints) {
-            gameState = 'BOSS'; boss = new Boss();
-            ui.bossHp.classList.remove('hidden'); ui.stage.innerText = "WARNING: BOSS!"; ui.stage.style.color = "#fff";
-            entities = [];
+            gameLoop = requestAnimationFrame(update);
         }
     }
 
-    if (gameState === 'BOSS') { boss.update(); ui.bossHp.innerText = `BOSS HP: ${boss.hp}`; }
-
-    for (let i = entities.length - 1; i >= 0; i--) {
-        let e = entities[i]; e.update();
-
-        for (let j = projectiles.length - 1; j >= 0; j--) {
-            let p = projectiles[j];
-            if (p.active && checkCollision(p, e)) {
-                if (e.type === 'air') {
-                    addScore(100); spawnParticles(e.x+10, e.y+10, e.color, 15); sfxExplosion();
-                    floatingTexts.push(new FloatingText(e.x, e.y, "+100", "#f1c40f"));
-                    entities.splice(i, 1); p.active = false; break;
-                } else if (e instanceof GasTank && p.type === 'nail') {
-                    spawnParticles(e.x+15, e.y+5, "#fff", 20); sfxExplosion(); shake(6);
-                    boss.hp--; boss.hurtFlash = 6; sfxBossHit();
-                    entities.splice(i, 1); p.active = false;
-                    if (boss.hp <= 0) defeatBoss();
-                    break;
-                }
-            }
-        }
-
-        if (e.x + e.w < -50) entities.splice(i, 1);
-        else if (checkCollision(player, e)) {
-            if (e.type === 'powerup') { activatePowerup(e.powerType); entities.splice(i, 1); sfxPowerup(); }
-            else if (player.p_invinc > 0) { spawnParticles(e.x+15, e.y+15, "#fff", 20); sfxExplosion(); shake(4); entities.splice(i, 1); addScore(50); }
-            else gameOver();
-        } else if (e instanceof GasTank && e.y + e.h >= GROUND_Y && e.type !== 'bouncer') {
-            spawnParticles(e.x+15, e.y+15, "#e74c3c", 25); spawnParticles(e.x+15, e.y, "#7f8c8d", 10, "smoke");
-            sfxExplosion(); shake(12); entities.splice(i, 1);
-            if (e.isIce) { let ice = new Obstacle('ground'); ice.x = e.x; ice.color = "#00ffff"; entities.push(ice); }
-        }
+    function endGame() {
+        isGameOver = true;
+        cancelAnimationFrame(gameLoop);
+        finalScoreEl.innerText = score;
+        gameOverScreen.style.display = 'flex';
     }
 
-    projectiles.forEach(p => p.update()); projectiles = projectiles.filter(p => p.active);
-    particles.forEach(p => p.update()); particles = particles.filter(p => p.life > 0);
-    floatingTexts.forEach(t => t.update()); floatingTexts = floatingTexts.filter(t => t.life > 0);
-    updatePowerupDisplay();
-}
-
-function activatePowerup(type) {
-    let dur = 600, msg = "";
-    switch(type) {
-        case 'spread': player.p_spread = dur; msg = "SPREAD!"; break;
-        case 'ice': player.p_ice = dur; msg = "ICE HOSE!"; break;
-        case 'star': player.p_invinc = dur; msg = "INVINCIBLE!"; break;
-        case 'multi': player.p_multi = dur; player.multiplier = 2; msg = "2X SCORE!"; break;
-        case 'jump': player.maxJumps = 2; player.p_multi = dur; msg = "DOUBLE JUMP!"; break;
-    }
-    floatingTexts.push(new FloatingText(player.x, player.y - 30, msg, "#9b59b6"));
-}
-
-function updatePowerupDisplay() {
-    let st = [];
-    if(player.p_invinc > 0) st.push("STAR");
-    if(player.p_spread > 0) st.push("SPREAD");
-    if(player.p_ice > 0) st.push("ICE");
-    if(player.p_multi > 0) st.push("2X");
-    if(player.maxJumps > 1) st.push("D-JUMP");
-    ui.power.innerText = st.join(" | ");
-}
-
-function defeatBoss() {
-    gameState = 'TRANSITION'; ui.bossHp.classList.add('hidden');
-    spawnParticles(boss.x + boss.w/2, boss.y + boss.h/2, "#f1c40f", 80); 
-    spawnParticles(boss.x + boss.w/2, boss.y + boss.h/2, "#7f8c8d", 40, "smoke"); 
-    shake(25); sfxExplosion();
-    
-    let flyTimer = setInterval(() => {
-        boss.y -= 12; boss.x += 6; boss.hurtFlash = 2; draw();
-        if (boss.y < -200) {
-            clearInterval(flyTimer); currentStage++;
-            bossTargetPoints += 1000 + (currentStage * 500); boss = null; globalSpeed += 1;
-            ui.stage.innerText = stages[currentStage % 5].name; ui.stage.style.color = stages[currentStage % 5].fire;
-            gameState = 'PLAYING';
-        }
-    }, 16);
-}
-
-function draw() {
-    bg.draw();
-    ctx.save();
-    if (screenShake > 0) {
-        ctx.translate((Math.random()-0.5)*screenShake, (Math.random()-0.5)*screenShake);
-        screenShake *= 0.85; if (screenShake < 0.5) screenShake = 0;
+    function resetGame() {
+        score = 0;
+        balance = 50;
+        intensity = 1;
+        isGameOver = false;
+        gameOverScreen.style.display = 'none';
+        playerEl.style.transform = `translateX(-50%) rotate(0deg)`;
+        gameLoop = requestAnimationFrame(update);
     }
 
-    if (player) player.draw(); if (boss) boss.draw();
-    entities.forEach(e => e.draw()); projectiles.forEach(p => p.draw());
-    particles.forEach(p => p.draw()); floatingTexts.forEach(t => t.draw());
-    
-    if (screenShake > 20) { ctx.fillStyle = "rgba(255,255,255,0.3)"; ctx.fillRect(0,0,W,H); }
-    ctx.restore();
-}
-
-function gameLoop() { update(); draw(); requestAnimationFrame(gameLoop); }
-
-function startGame(e) {
-    if(e) { e.preventDefault(); e.stopPropagation(); }
-    initAudio();
-    ui.start.classList.add('hidden'); ui.over.classList.add('hidden'); ui.hud.classList.remove('hidden');
-    resize(); 
-    
-    player = new Player(); entities = []; projectiles = []; particles = []; floatingTexts = [];
-    score = 0; distance = 0; frameCount = 0; currentStage = 0; globalSpeed = 8;
-    bossTargetPoints = 1000; boss = null; gameState = 'PLAYING';
-    
-    ui.stage.innerText = stages[0].name; ui.stage.style.color = stages[0].fire;
-    startSiren();
-    if(!renderLoopStarted) { renderLoopStarted = true; requestAnimationFrame(gameLoop); }
-}
-
-function gameOver() {
-    gameState = 'GAMEOVER'; stopSiren(); shake(25); sfxExplosion();
-    spawnParticles(player.x + 40, player.y + 20, "#e74c3c", 80);
-    spawnParticles(player.x + 40, player.y + 20, "#333", 40, "smoke");
-    if (score > highScore) { highScore = Math.floor(score); localStorage.setItem('ambulanceHighScore', highScore); }
-    ui.hud.classList.add('hidden'); ui.over.classList.remove('hidden');
-    document.getElementById('finalScore').innerText = Math.floor(score); ui.hiEnd.innerText = highScore;
-}
-
-function handleInput(e, isTouch = false) {
-    if(gameState !== 'PLAYING' && gameState !== 'BOSS') return;
-    let x, y;
-    if (isTouch) {
-        e.preventDefault(); 
-        if(e.changedTouches && e.changedTouches.length > 0) { x = e.changedTouches[0].clientX; y = e.changedTouches[0].clientY; }
-        else return;
-    } else {
-        if (e.code === 'Space') { player.jump(); return; }
-        if (e.code === 'KeyF') { player.shoot(false); return; }
-        if (e.code === 'KeyG') { player.shoot(true); return; }
-        return; 
-    }
-    if (x < W / 2) player.jump();
-    else if (y < H / 2) player.shoot(true); 
-    else player.shoot(false); 
-}
-
-['click', 'touchstart'].forEach(evt => { ui.startBtn.addEventListener(evt, startGame, {passive: false}); ui.restartBtn.addEventListener(evt, startGame, {passive: false}); });
-canvas.addEventListener('touchstart', (e) => handleInput(e, true), {passive: false});
-window.addEventListener('keydown', (e) => handleInput(e, false));
-window.oncontextmenu = function(e) { e.preventDefault(); e.stopPropagation(); return false; };
-
-draw();
-if(!renderLoopStarted) { renderLoopStarted = true; requestAnimationFrame(gameLoop); }
-
+    // Start Game
+    resetGame();
 </script>
+
 </body>
 </html>
-
